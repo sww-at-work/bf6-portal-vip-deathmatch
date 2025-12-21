@@ -23,9 +23,11 @@ export class VIPFiesta {
 
     // Initialize the game mode - call from OnGameModeStarted
     public initialize(): void {
-        // Set game mode rules
-        mod.SetGameModeTargetScore(CONFIG.WIN_SCORE); // 20 points to win
-        mod.SetGameModeTimeLimit(CONFIG.TIME_LIMIT_SECONDS); // 20 minutes
+        // Set time limit (20 minutes) - we handle scoring ourselves
+        mod.SetGameModeTimeLimit(CONFIG.TIME_LIMIT_SECONDS);
+
+        // NOTE: We don't use SetGameModeTargetScore because we track scores ourselves
+        // Portal's built-in score system may conflict with our custom scoring
 
         // Initialize score UI
         this.scoreUI.initialize();
@@ -51,15 +53,11 @@ export class VIPFiesta {
 
     // Announce new VIP to players
     private announceNewVIP(player: mod.Player, teamId: number): void {
-        const team = getTeamById(teamId);
-
-        // Notify the VIP player
+        // Notify the VIP player (important - use notification)
         mod.DisplayNotificationMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
 
-        // Notify all other players
-        if (team) {
-            mod.DisplayNotificationMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.newVip, player));
-        }
+        // Notify all other players (less intrusive - use world log)
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.newVip, player));
     }
 
     // Handle player death - call from OnPlayerDied
@@ -87,11 +85,14 @@ export class VIPFiesta {
             this.awardPoint(killerTeamId);
         }
 
-        // Notify dead VIP's team
-        mod.DisplayNotificationMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), deadPlayerTeam);
+        // Notify dead VIP's team (world log - less intrusive)
+        mod.DisplayHighlightedWorldLogMessage(
+            mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied),
+            deadPlayerTeam
+        );
 
-        // Notify that new VIP is being selected
-        mod.DisplayNotificationMessage(
+        // Notify that new VIP is being selected (world log)
+        mod.DisplayHighlightedWorldLogMessage(
             mod.Message(mod.stringkeys.vipFiesta.notifications.selectingNewVip),
             deadPlayerTeam
         );
@@ -111,8 +112,8 @@ export class VIPFiesta {
         // Update UI
         this.scoreUI.updateScore(teamId, newScore);
 
-        // Announce the score
-        mod.DisplayNotificationMessage(
+        // Announce the score (world log - scrolling message)
+        mod.DisplayHighlightedWorldLogMessage(
             mod.Message(mod.stringkeys.vipFiesta.notifications.vipKilled, teamId, newScore)
         );
 
@@ -144,6 +145,7 @@ export class VIPFiesta {
     // Handle time limit reached - call from OnTimeLimitReached
     public onTimeLimitReached(): void {
         if (this.state.gameEnded) return;
+        if (!this.state.gameStarted) return; // Don't end if game hasn't properly started
 
         // Find team with highest score
         const winningTeamId = getWinningTeamId(this.state);

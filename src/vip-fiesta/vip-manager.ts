@@ -6,10 +6,19 @@ export function getTeamById(teamId: number): mod.Team {
     return mod.GetTeam(teamId);
 }
 
-// Get alive players from a team
+// Check if player is deployed (safe to call GetSoldierState)
+function isPlayerDeployed(player: mod.Player): boolean {
+    try {
+        return mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive);
+    } catch {
+        return false;
+    }
+}
+
+// Get alive players from a team (only deployed players)
 function getAlivePlayersInTeam(team: mod.Team): mod.Player[] {
     const members = getPlayersInTeam(team);
-    return members.filter((player) => mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive));
+    return members.filter((player) => isPlayerDeployed(player));
 }
 
 // Select a random VIP from team members
@@ -114,6 +123,9 @@ export function isPlayerVIP(player: mod.Player, state: VIPFiestaState): boolean 
 
 // Maintain VIP spotting (call this in OngoingPlayer)
 export function maintainVIPSpotting(player: mod.Player, state: VIPFiestaState): void {
+    // Only spot if player is deployed and is VIP
+    if (!isPlayerDeployed(player)) return;
+
     if (isPlayerVIP(player, state)) {
         // Refresh spotting to keep VIP visible
         mod.SpotTarget(player, 10, mod.SpotStatus.SpotInBoth);
