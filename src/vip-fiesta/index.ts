@@ -1,4 +1,11 @@
-import { VIPFiestaState, CONFIG, createInitialState, getWinningTeamId } from './state.ts';
+import {
+    VIPFiestaState,
+    CONFIG,
+    createInitialState,
+    getWinningTeamId,
+    calculateActiveTeamIds,
+    activeTeamsChanged,
+} from './state.ts';
 import {
     selectInitialVIPs,
     handleVIPDeath,
@@ -38,17 +45,47 @@ export class VIPFiesta {
         // Announce game start to all players
         mod.DisplayNotificationMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
 
-        // Select initial VIPs after a short delay to let players spawn
+        // Wait for players to be assigned to teams, then detect active teams and select VIPs
         mod.Wait(5).then(() => {
+            this.refreshActiveTeams();
             this.selectAllInitialVIPs();
         });
     }
 
-    // Select VIPs for all teams
+    // Select VIPs for all active teams
     private selectAllInitialVIPs(): void {
         selectInitialVIPs(this.state, (player, teamId) => {
             this.announceNewVIP(player, teamId);
         });
+    }
+
+    // Refresh active teams and update UI
+    private refreshActiveTeams(): void {
+        const newActiveTeams = calculateActiveTeamIds();
+
+        if (activeTeamsChanged(this.state.activeTeamIds, newActiveTeams)) {
+            const previousTeams = [...this.state.activeTeamIds];
+            this.state.activeTeamIds = newActiveTeams;
+
+            // Update UI to show only active teams
+            this.scoreUI.updateActiveTeams(newActiveTeams);
+
+            // Handle newly active teams (need VIP selection)
+            for (const teamId of newActiveTeams) {
+                if (!previousTeams.includes(teamId)) {
+                    // New team became active - check if needs VIP
+                    if (this.state.teamVIPs.get(teamId) === null && !this.state.vipCooldowns.has(teamId)) {
+                        const newVIP = selectRandomVIP(teamId, this.state);
+                        if (newVIP) {
+                            const vipId = mod.GetObjId(newVIP);
+                            this.state.teamVIPs.set(teamId, vipId);
+                            applyVIPSpotting(newVIP);
+                            this.announceNewVIP(newVIP, teamId);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Announce new VIP to players
@@ -105,6 +142,9 @@ export class VIPFiesta {
 
     // Award a point to a team
     private awardPoint(teamId: number): void {
+        // Only award points to active teams
+        if (!this.state.activeTeamIds.includes(teamId)) return;
+
         const currentScore = this.state.teamScores.get(teamId) ?? 0;
         const newScore = currentScore + 1;
         this.state.teamScores.set(teamId, newScore);
@@ -181,7 +221,12 @@ export class VIPFiesta {
 
     // Handle player join - call from OnPlayerJoinGame
     public onPlayerJoinGame(player: mod.Player): void {
-        // Nothing specific needed - VIP selection happens on deploy
+        if (!this.state.gameStarted) return;
+
+        // Delay to allow Portal to assign player to team, then refresh active teams
+        mod.Wait(1).then(() => {
+            this.refreshActiveTeams();
+        });
     }
 
     // Handle player leave - call from OnPlayerLeaveGame
@@ -204,6 +249,11 @@ export class VIPFiesta {
                 }
             }
         }
+
+        // Refresh active teams after player leaves
+        mod.Wait(0.5).then(() => {
+            this.refreshActiveTeams();
+        });
     }
 
     // Handle team switch - call from OnPlayerSwitchTeam
@@ -230,6 +280,9 @@ export class VIPFiesta {
                 }
             }
         }
+
+        // Refresh active teams after team switch
+        this.refreshActiveTeams();
     }
 
     // Maintain VIP spotting - call from OngoingPlayer (30x/sec)

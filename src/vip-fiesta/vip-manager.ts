@@ -1,5 +1,5 @@
 import { getPlayersInTeam } from '../modlib/index.ts';
-import { VIPFiestaState, CONFIG } from './state.ts';
+import { VIPFiestaState } from './state.ts';
 
 // Get team by ID - uses mod.GetTeam(teamId) directly
 export function getTeamById(teamId: number): mod.Team {
@@ -91,13 +91,13 @@ export async function handleVIPDeath(
     }
 }
 
-// Select initial VIPs for all teams
+// Select initial VIPs for all active teams
 export function selectInitialVIPs(
     state: VIPFiestaState,
     onVIPSelected: (player: mod.Player, teamId: number) => void
 ): void {
-    // Iterate through all configured teams (1-8)
-    for (let teamId = 1; teamId <= CONFIG.TEAM_COUNT; teamId++) {
+    // Only iterate through active teams (those with players)
+    for (const teamId of state.activeTeamIds) {
         const team = getTeamById(teamId);
         const members = getPlayersInTeam(team);
         if (members.length === 0) continue;

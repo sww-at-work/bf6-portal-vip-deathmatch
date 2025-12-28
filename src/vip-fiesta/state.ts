@@ -18,6 +18,9 @@ export interface VIPFiestaState {
     // VIP selection cooldown - teams where VIP just died and are in cooldown
     vipCooldowns: Set<number>;
 
+    // Active teams - teams with at least one player (dynamically updated)
+    activeTeamIds: number[];
+
     // Game status
     gameStarted: boolean;
     gameEnded: boolean;
@@ -29,6 +32,7 @@ export function createInitialState(): VIPFiestaState {
         teamScores: new Map(),
         teamVIPs: new Map(),
         vipCooldowns: new Set(),
+        activeTeamIds: [],
         gameStarted: false,
         gameEnded: false,
     };
@@ -42,12 +46,43 @@ export function createInitialState(): VIPFiestaState {
     return state;
 }
 
-// Helper to get team with highest score
+// Calculate active teams based on current player distribution
+export function calculateActiveTeamIds(): number[] {
+    const activeTeams = new Set<number>();
+    const allPlayers = mod.AllPlayers();
+    const count = mod.CountOf(allPlayers);
+
+    for (let i = 0; i < count; i++) {
+        const player = mod.ValueInArray(allPlayers, i) as mod.Player;
+        const team = mod.GetTeam(player);
+        const teamId = mod.GetObjId(team);
+
+        if (teamId >= 1 && teamId <= CONFIG.TEAM_COUNT) {
+            activeTeams.add(teamId);
+        }
+    }
+
+    // Return sorted array for consistent UI ordering
+    return Array.from(activeTeams).sort((a, b) => a - b);
+}
+
+// Check if two arrays of team IDs are different
+export function activeTeamsChanged(oldTeams: number[], newTeams: number[]): boolean {
+    if (oldTeams.length !== newTeams.length) return true;
+    for (let i = 0; i < oldTeams.length; i++) {
+        if (oldTeams[i] !== newTeams[i]) return true;
+    }
+    return false;
+}
+
+// Helper to get team with highest score (only considers active teams)
 export function getWinningTeamId(state: VIPFiestaState): number {
-    let winningTeamId = 1;
+    let winningTeamId = state.activeTeamIds[0] ?? 1;
     let highestScore = -1;
 
-    for (const [teamId, score] of state.teamScores) {
+    // Only check active teams
+    for (const teamId of state.activeTeamIds) {
+        const score = state.teamScores.get(teamId) ?? 0;
         if (score > highestScore) {
             highestScore = score;
             winningTeamId = teamId;
