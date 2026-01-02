@@ -1,18 +1,10 @@
-# Idee
+# Tasks
 
-modus in dem jedes team einen VIP hat
-wir möchten 8 Teams a 4 Spielern (also quasi ein Squad pro Team)
+## Teams
 
-## VIP's
-
-VIP's müssen dauerhaft "gespotted" werden, heißt jeder kann sie dauerhaft sehen
-
-## Punkte
-
-Ein Team erhält einen Punkt wenn es einen gegnerischen VIP getötet hat
-
-## Gewinn
-
-Es gibt eine Rundenzeit von 20 Minuten
-Das Team das 20 Punkte erreicht, gewinnt sofort
-wenn die Zeit abgelaufen ist, gewinnt das Team mit den meisten Punkten
+- Teams should be dynamic and not configured hard-coded (currently 8) in the code
+  - The teams amount is specified in the portal web ui and the amount of players in a team 
+  can vary from 0 to N
+  - teams are filled in ascending order by the game
+  - if there aren't enough players for the defined teams, the latter teams will remain unused/empty
+  - the strings for the ui should hold up to 100 teams

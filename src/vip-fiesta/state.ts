@@ -3,7 +3,7 @@ export const CONFIG = {
     WIN_SCORE: 20,
     TIME_LIMIT_SECONDS: 1200, // 20 minutes
     VIP_RESPAWN_DELAY_SECONDS: 3,
-    TEAM_COUNT: 8,
+    TEAM_COUNT: 100,
     PLAYERS_PER_TEAM: 4,
 } as const;
 
@@ -37,7 +37,7 @@ export function createInitialState(): VIPFiestaState {
         gameEnded: false,
     };
 
-    // Initialize all 8 teams with 0 score and no VIP
+    // Initialize all teams with 0 score and no VIP
     for (let teamId = 1; teamId <= CONFIG.TEAM_COUNT; teamId++) {
         state.teamScores.set(teamId, 0);
         state.teamVIPs.set(teamId, null);

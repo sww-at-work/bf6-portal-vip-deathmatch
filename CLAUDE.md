@@ -48,6 +48,8 @@ All Portal API functionality is accessed through the global `mod` namespace:
 - `mod.Message()` - Create string references
 - `mod.Wait()` - Async delay
 
+DO NOT make up methods in the mod namespace that aren't defined in the `mod/index.d.ts`
+
 ### Key Directories
 
 - `src/` - Source code; `index.ts` is the entry point with all event handlers

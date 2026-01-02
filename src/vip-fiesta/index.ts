@@ -15,7 +15,6 @@ import {
     selectRandomVIP,
     applyVIPSpotting,
     getTeamById,
-    getPlayerById,
 } from './vip-manager.ts';
 import { VIPFiestaScoreUI } from './score-ui.ts';
 
@@ -68,7 +67,7 @@ export class VIPFiesta {
             this.state.activeTeamIds = newActiveTeams;
 
             // Update UI to show only active teams
-            this.scoreUI.updateActiveTeams(newActiveTeams);
+            this.scoreUI.updateActiveTeams(this.state);
 
             // Handle newly active teams (need VIP selection)
             for (const teamId of newActiveTeams) {
@@ -150,7 +149,7 @@ export class VIPFiesta {
         this.state.teamScores.set(teamId, newScore);
 
         // Update UI
-        this.scoreUI.updateScore(teamId, newScore);
+        this.scoreUI.updateScore(teamId, newScore, this.state);
 
         // Announce the score (world log - scrolling message)
         mod.DisplayHighlightedWorldLogMessage(
