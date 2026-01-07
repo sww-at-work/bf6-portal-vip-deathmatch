@@ -1,12 +1,9 @@
 # AI Coding Assistant Instructions for Battlefield 6 Portal Scripting
 
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-This is a TypeScript template for creating Battlefield 6 Portal experiences (custom game modes/mods). Code is compiled via a custom bundler and manually uploaded to Portal's web editor.
+This is a TypeScript template for creating Battlefield 6 Portal experiences (custom game modes/mods). 
+Code is compiled via a custom bundler and manually uploaded to Portal's web editor.
 
 **Key Technologies:**
 
@@ -50,14 +47,13 @@ All Portal API functionality is accessed through the global `mod` namespace:
 - `mod.Message()` - Create string references
 - `mod.Wait()` - Async delay
 
-DO NOT make up methods in the mod namespace that aren't defined in the `bf6-portal-mod-types/index.d.ts`
+**IMPORTANT** DO NOT make up methods in the mod namespace that aren't defined in `bf6-portal-mod-types/index.d.ts`
 
 ### Key Directories
 
 - `src/` - Source code; `index.ts` is the entry point with all event handlers
-- `src/helpers/` - Custom utility functions
+- `src/<mod-name>/` - Individual game mode/utility folder with mode-specific code
 - `src/modlib/` - Official Portal helper library (excluded from linting)
-- `src/debug-tool/` - Optional admin debug menu (can be removed)
 - `spatials/` - Spatial Editor JSON map files (optional)
 - `dist/` - Build output (upload these files to Portal)
 
@@ -92,19 +88,18 @@ Always start by reading the types in `node_modules/bf6-portal-mod-types/index.d.
 
 ### Player State Queries
 
-**CRITICAL: Check if player is deployed before querying soldier state!**
+**CRITICAL: Check if player is deployed/alive before applying any actions to a player!**
 
 ```typescript
 // BAD - throws "PlayerNotDeployed" exception if player not spawned
-mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive);
+mod.AddEquipment(player, weapon);
 
 // GOOD - check IsAlive first, or wrap in try/catch
 if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) {
-    // Safe to query other states
+    // Safe to apply actions to player
+    mod.AddEquipment(player, weapon);
 }
 ```
-
-The error `Exception: PlayerNotDeployed` occurs when calling `GetSoldierState()` on a player who hasn't spawned yet (e.g., in deploy screen).
 
 ### Teams API
 
@@ -118,16 +113,8 @@ const teams = mod.AllTeams();
 const team = mod.GetTeam(teamId); // teamId: number
 ```
 
-To iterate teams, either 
+To iterate teams, iterate through players and collect existing teams:
 
-- use a for loop with known team count:
-```typescript
-for (let teamId = 1; teamId <= TEAM_COUNT; teamId++) {
-    const team = mod.GetTeam(teamId);
-    // ...
-}
-```
-- or iterate through players and collect existing teams:
 ```typescript
 const teamsSet = new Set<mod.Team>();
 const allPlayers = mod.AllPlayers();
@@ -230,8 +217,9 @@ async function example() {
 
 1. Use unique widget names to find/update widgets later
 2. Store widget names as constants
-3. UI is global - widgets are visible to all players unless restricted
+3. UI widgets by default are global unless a specific receiver is set (team or player)
 4. Use `mod.GetUIRoot()` as parent for top-level containers
+5. Containers can be nested for complex layouts
 
 ```typescript
 const WIDGET_NAME = 'my_unique_widget';
@@ -248,8 +236,7 @@ mod.SetUITextLabel(widget, newMessage);
 
 1. **Create module folder** under `src/` (e.g., `src/my-mode/`)
 2. **Create strings.json** for all UI text
-3. **Create state.ts** for game state management
-4. **Create main controller class** with methods for each event
-5. **Integrate in src/index.ts** - import and call controller methods from event handlers
-6. **Run `npm run build`** and check for TypeScript errors
-7. **Test in Portal** - check `PortalLog.txt` for runtime errors
+3. **Create main controller class** with methods for each event
+4. **Integrate in src/index.ts** - import and call controller methods from event handlers
+5. **Run `npm run build`** and check for TypeScript errors
+6. **Test in Portal** - check `PortalLog.txt` for runtime errors

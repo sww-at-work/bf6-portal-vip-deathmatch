@@ -1,5 +1,6 @@
 import { getPlayersInTeam } from '../modlib/index.ts';
-import { VIPFiestaState } from './state.ts';
+import { CONFIG } from './state.ts';
+import type { VIPFiestaState } from './state.ts';
 
 // Get team by ID - uses mod.GetTeam(teamId) directly
 export function getTeamById(teamId: number): mod.Team {

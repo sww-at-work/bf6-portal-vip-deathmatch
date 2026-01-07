@@ -1,4 +1,5 @@
-import { CONFIG, VIPFiestaState } from './state.ts';
+import { CONFIG } from './state.ts';
+import type { VIPFiestaState } from './state.ts';
 
 // Generate team colors programmatically for up to CONFIG.TEAM_COUNT teams
 function generateTeamColors(): mod.Vector[] {
@@ -140,10 +141,6 @@ export class VIPFiestaScoreUI {
     public updateActiveTeams(state: VIPFiestaState): void {
         if (!this.initialized) return;
 
-        // Get current player and their team
-        const currentPlayer = mod.GetPlayerFromObjId(mod.GetLocalPlayerId());
-        const currentPlayerTeam = currentPlayer ? mod.GetObjId(mod.GetTeam(currentPlayer)) : null;
-
         // Sort active teams by score (descending)
         const sortedTeams = state.activeTeamIds
             .map(teamId => ({
@@ -154,32 +151,6 @@ export class VIPFiestaScoreUI {
 
         // Select top 5 teams
         const topTeams = sortedTeams.slice(0, 5);
-
-        // Add current player's team if not already in top 5
-        const teamsToShow: Array<{teamId: number, rank: number}> = [];
-        const teamRanks = new Map<number, number>();
-
-        // Assign ranks to all teams
-        sortedTeams.forEach((team, index) => {
-            teamRanks.set(team.teamId, index + 1);
-        });
-
-        // Add top teams with their ranks
-        topTeams.forEach(team => {
-            teamsToShow.push({
-                teamId: team.teamId,
-                rank: teamRanks.get(team.teamId) ?? 1
-            });
-        });
-
-        // Add current player's team if not in top 5
-        if (currentPlayerTeam && !topTeams.some(t => t.teamId === currentPlayerTeam)) {
-            const playerTeamRank = teamRanks.get(currentPlayerTeam) ?? 1;
-            teamsToShow.push({
-                teamId: currentPlayerTeam,
-                rank: playerTeamRank
-            });
-        }
 
         // Hide all team widgets first
         for (let teamId = 1; teamId <= CONFIG.TEAM_COUNT; teamId++) {
@@ -192,25 +163,25 @@ export class VIPFiestaScoreUI {
         // Resize container based on teams to show count
         const container = mod.FindUIWidgetWithName(CONTAINER_NAME);
         if (container) {
-            const newHeight = this.calculateContainerHeight(teamsToShow.length);
+            const newHeight = this.calculateContainerHeight(topTeams.length);
             mod.SetUIWidgetSize(container, mod.CreateVector(640, newHeight, 0));
         }
 
         // Show and reposition selected team widgets
-        teamsToShow.forEach((teamInfo, displayIndex) => {
+        topTeams.forEach((teamInfo, displayIndex) => {
             const widget = mod.FindUIWidgetWithName(getScoreWidgetName(teamInfo.teamId));
             if (widget) {
-                const pos = this.calculateWidgetPosition(displayIndex, teamsToShow.length);
+                const pos = this.calculateWidgetPosition(displayIndex, topTeams.length);
                 mod.SetUIWidgetPosition(widget, mod.CreateVector(pos.x, pos.y, 0));
                 mod.SetUIWidgetVisible(widget, true);
 
                 // Update the text to show rank instead of team ID
-                const score = state.teamScores.get(teamInfo.teamId) ?? 0;
-                mod.SetUITextLabel(widget, mod.Message(mod.stringkeys.vipFiesta.ui.teamScore, teamInfo.rank, score));
+                const score = teamInfo.score;
+                mod.SetUITextLabel(widget, mod.Message(mod.stringkeys.vipFiesta.ui.teamScore, displayIndex + 1, score));
             }
         });
 
-        this.currentActiveTeams = teamsToShow.map(t => t.teamId);
+        this.currentActiveTeams = topTeams.map(t => t.teamId);
     }
 
     // Update score display for a specific team
