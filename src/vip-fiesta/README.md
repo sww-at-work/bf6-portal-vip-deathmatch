@@ -34,7 +34,7 @@ The team with the most VIP kills at the end of the match wins.
 - the target number of VIP kills to win should be displayed centrally above the score UI
 - the score UI should show the top teams based on VIP kills, sorted in descending order
 - the score UI should show a maximum of 3 teams at once
-- the player's team entry in the score UI should always be visually distinguished (e.g. highlighted background and *YOU* label)
+- the player's team entry in the score UI should always be visually distinguished (e.g. highlighted background and _YOU_ label)
 - the player's team should always be visible, even if not in the top teams
 - the player's team should be positioned according to its rank:
 - if the player's team is not in the top teams
@@ -54,7 +54,7 @@ The team with the most VIP kills at the end of the match wins.
   - the world icon image for enemy VIPs is a Skull (alternative DangerPing, Alert)
   - the world icon text should display the distance to the VIP
   - the world icon should be repositioned every tick to stay above the VIP's head
-  - the world icons should be generated per player, so 
+  - the world icons should be generated per player, so
     - players on the same team see their VIP's icon in a friendly color (green) and enemy VIPs in an enemy color (red)
     - the distance text updates correctly for each player
   - in order to show icons on the minimap that differ from usual spotted enemies an additional spotting mechanism is used
@@ -80,7 +80,7 @@ The team with the most VIP kills at the end of the match wins.
 
 #### Scoreboard Sorting
 
-- the scoreboard should be sorted by an internal sorting number in ascending order: 
+- the scoreboard should be sorted by an internal sorting number in ascending order:
   - players are clustered by their team.
   - The teams are sorted by the team rank (VIP Kills) in descending order.
   - within each team, the players are sorted by their VIP kills and then total killsin descending order.
@@ -102,7 +102,7 @@ The following file structure is an example, but not mandatory, for organizing th
 
 - `vip-fiesta/`
   - `README.md` - This file, describing the game mode and its implementation details.
-  - `vip-fiesta.ts` - Starting point of the game mode, handling core logic and event registration.
+  - `index.ts` - Starting point of the game mode, handling core logic and event registration.
   - `team-management.ts` - Logic for team assignments and VIP selection.
   - `hud-ui.ts` - HUD UI elements for displaying VIP status and scores.
   - `scoreboard.ts` - Custom scoreboard implementation reflecting VIP kills and player stats.
@@ -118,5 +118,3 @@ The following file structure is an example, but not mandatory, for organizing th
 - How to handle team balancing if players join/leave mid-game?
 - How is the team assignment behavior when players join mid-game via friends or matchmaking?
 - how are squads organized within teams (e.g. is there more than one squad per team possible)?
-
-
