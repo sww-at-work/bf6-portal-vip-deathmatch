@@ -1,6 +1,6 @@
 import { getPlayersInTeam, ShowEventGameModeMessage, ShowHighlightedGameModeMessage } from '../modlib/index.ts';
 import { CONFIG } from './config.ts';
-import { refreshSpotsForObserver, updateIconDistancesForObserver } from './spotting.ts';
+import { spotVipTargetsGlobal } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 import { handlePlayerDied } from './scoring.ts';
 import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
@@ -14,8 +14,7 @@ export class VIPFiesta {
     private playerDeathsById: Map<number, number> = new Map();
     private playerVipKillsById: Map<number, number> = new Map();
     private vipSpottingShownFor: Map<number, { youAreVip: boolean }> = new Map();
-    private lastSpotRefreshAt: Map<number, number> = new Map(); // observerId -> timestamp (ms)
-    private observerWorldIcons: Map<number, Map<number, mod.WorldIcon>> = new Map(); // observerId -> (vipId -> icon)
+    private lastGlobalSpotAt = 0;
 
     initialize(): void {
         initializeScoreboard();
@@ -29,9 +28,17 @@ export class VIPFiesta {
 
     ongoingPlayer(player: mod.Player): void {
         // Placeholder: keep minimal to avoid per-tick overhead
-        // Intended: maintain 3D markers and minimap spotting for current VIPs
+        // Maintain edge notification only; global spotting handled centrally
         this.updateSpottingForPlayer(player);
-        updateIconDistancesForObserver(player, this.observerWorldIcons);
+    }
+
+    ongoingGlobal(): void {
+        // Central VIP spotting for all players (minimap + 3D), throttled to 1s
+        const now = Date.now();
+        if (now - this.lastGlobalSpotAt >= 1000) {
+            spotVipTargetsGlobal(this.teamVipById);
+            this.lastGlobalSpotAt = now;
+        }
     }
 
     onPlayerDeployed(player: mod.Player): void {
@@ -73,20 +80,9 @@ export class VIPFiesta {
         }
         this.vipSpottingShownFor.set(playerId, state);
 
-        // World/minimap spotting refresh (throttled) using SpotInBoth
-        if (CONFIG.markers.enable3DIcons || CONFIG.markers.enableMinimapSpotting) {
-            const now = Date.now();
-            const last = this.lastSpotRefreshAt.get(playerId) ?? 0;
-            if (now - last > 1000) {
-                this.refreshSpotsForObserver(player);
-                this.lastSpotRefreshAt.set(playerId, now);
-            }
-        }
+        // Observer-based spotting reserved for future; do not spot per-player here
     }
 
-    private refreshSpotsForObserver(observer: mod.Player): void {
-        refreshSpotsForObserver(observer, this.teamVipById, this.observerWorldIcons);
-    }
 
     onPlayerDied(player: mod.Player, other: mod.Player): void {
         handlePlayerDied(

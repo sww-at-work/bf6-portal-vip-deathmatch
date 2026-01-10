@@ -5,6 +5,7 @@ let vipFiesta: VIPFiesta | undefined;
 // This will trigger every sever tick.
 export function OngoingGlobal(): void {
     // Do something minimal every tick. Remember, this gets called 30 times per second.
+    vipFiesta?.ongoingGlobal();
 }
 
 // This will trigger every sever tick, for each Player.
