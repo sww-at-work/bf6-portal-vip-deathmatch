@@ -9,7 +9,8 @@
       "scoreboardColTeam": "Team",
       "scoreboardColVipKills": "VIP Kills",
       "scoreboardColKills": "Kills",
-      "scoreboardColDeaths": "Deaths"
+      "scoreboardColDeaths": "Deaths",
+      "scoreboardColSortOrder": "Order"
     },
     "notifications": {
       "youAreVip": "You are the VIP! Stay alive!",

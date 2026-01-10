@@ -3,6 +3,7 @@ import { CONFIG } from './config.ts';
 import { refreshSpotsForObserver, updateIconDistancesForObserver } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 import { handlePlayerDied } from './scoring.ts';
+import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
 
 export class VIPFiesta {
     private teamVipById: Map<number, number> = new Map();
@@ -11,11 +12,13 @@ export class VIPFiesta {
     private gameEnded = false;
     private playerKillsById: Map<number, number> = new Map();
     private playerDeathsById: Map<number, number> = new Map();
+    private playerVipKillsById: Map<number, number> = new Map();
     private vipSpottingShownFor: Map<number, { youAreVip: boolean }> = new Map();
     private lastSpotRefreshAt: Map<number, number> = new Map(); // observerId -> timestamp (ms)
     private observerWorldIcons: Map<number, Map<number, mod.WorldIcon>> = new Map(); // observerId -> (vipId -> icon)
 
     initialize(): void {
+        initializeScoreboard();
         ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
@@ -88,12 +91,16 @@ export class VIPFiesta {
             this.vipKillsByTeamId,
             this.playerKillsById,
             this.playerDeathsById,
+            this.playerVipKillsById,
             (team) => this.assignVipForTeam(team),
             () => this.gameEnded,
             (ended) => {
                 this.gameEnded = ended;
             }
         );
+        
+        // Update scoreboard after death processing
+        this.updateScoreboardValues();
     }
 
     onPlayerJoinGame(player: mod.Player): void {
@@ -102,6 +109,9 @@ export class VIPFiesta {
         if (!this.teamVipById.has(teamId)) {
             this.assignVipForTeam(team);
         }
+        
+        // Update scoreboard when player joins
+        this.updateScoreboardValues();
     }
 
     onPlayerLeaveGame(playerId: number): void {
@@ -111,6 +121,9 @@ export class VIPFiesta {
                 this.teamVipById.delete(teamId);
             }
         }
+        
+        // Update scoreboard when player leaves
+        this.updateScoreboardValues();
     }
 
     onPlayerSwitchTeam(player: mod.Player, newTeam: mod.Team): void {
@@ -127,6 +140,9 @@ export class VIPFiesta {
         if (!this.teamVipById.has(newTeamId)) {
             this.assignVipForTeam(newTeam);
         }
+        
+        // Update scoreboard when player switches team
+        this.updateScoreboardValues();
     }
 
     onTimeLimitReached(): void {
@@ -154,6 +170,19 @@ export class VIPFiesta {
 
         // Notify the new VIP
         ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), newVip);
+        
+        // Update scoreboard when VIP changes
+        this.updateScoreboardValues();
+    }
+
+    private updateScoreboardValues(): void {
+        updateScoreboard({
+            teamVipById: this.teamVipById,
+            vipKillsByTeamId: this.vipKillsByTeamId,
+            playerVipKillsById: this.playerVipKillsById,
+            playerKillsById: this.playerKillsById,
+            playerDeathsById: this.playerDeathsById,
+        });
     }
 
 

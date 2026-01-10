@@ -8,6 +8,7 @@ export function handlePlayerDied(
     vipKillsByTeamId: Map<number, number>,
     playerKillsById: Map<number, number>,
     playerDeathsById: Map<number, number>,
+    playerVipKillsById: Map<number, number>,
     assignVipForTeam: (team: mod.Team) => void,
     getGameEnded: () => boolean,
     setGameEnded: (ended: boolean) => void
@@ -26,6 +27,9 @@ export function handlePlayerDied(
     if (vipId !== undefined && vipId === victimId) {
         const killerTeamId = mod.GetObjId(mod.GetTeam(other));
         vipKillsByTeamId.set(killerTeamId, (vipKillsByTeamId.get(killerTeamId) ?? 0) + 1);
+        
+        // Track individual player VIP kills
+        playerVipKillsById.set(killerId, (playerVipKillsById.get(killerId) ?? 0) + 1);
 
         ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
 
