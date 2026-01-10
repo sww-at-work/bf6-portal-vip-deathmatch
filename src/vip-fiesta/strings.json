@@ -7,6 +7,7 @@
       "distanceMeters": "{}m",
       "scoreboardTitle": "VIP FIESTA",
       "scoreboardColTeam": "Team",
+      "scoreboardColVipStatus": "VIP",
       "scoreboardColVipKills": "VIP Kills",
       "scoreboardColKills": "Kills",
       "scoreboardColDeaths": "Deaths",

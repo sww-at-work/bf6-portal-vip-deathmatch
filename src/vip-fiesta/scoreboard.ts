@@ -32,20 +32,21 @@ export function initializeScoreboard(): void {
     mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
 
     // Configure column names
-    // Columns: Team, VIP Status, VIP Kills, Kills, Deaths
+    // Columns: Team, VIP Status, VIP Kills, Kills, Deaths, Sort Order
     mod.SetScoreboardColumnNames(
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColTeam),
+        mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColVipStatus),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColVipKills),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColKills),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColDeaths),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColSortOrder) // Hidden column for sorting
     );
 
-    // Set column widths (team, vipKills, kills, deaths, sortOrder)
-    mod.SetScoreboardColumnWidths(10, 15, 15, 15, 1);
+    // Set column widths (team, vipStatus, vipKills, kills, deaths, sortOrder)
+    mod.SetScoreboardColumnWidths(8, 5, 12, 12, 12, 1);
 
-    // Sort by the 5th column (sortOrder) in ascending order
-    mod.SetScoreboardSorting(5, false);
+    // Sort by the 6th column (sortOrder) in ascending order
+    mod.SetScoreboardSorting(6, false);
 }
 
 /**
@@ -104,6 +105,17 @@ function calculateTeamRanks(vipKillsByTeamId: Map<number, number>): Map<number, 
 }
 
 /**
+ * Check if a player is currently a VIP
+ * Returns 1 if VIP, 0 otherwise
+ */
+function getVipStatus(playerId: number, teamVipById: Map<number, number>): number {
+    for (const [, vipId] of teamVipById.entries()) {
+        if (vipId === playerId) return 1;
+    }
+    return 0;
+}
+
+/**
  * Update scoreboard values for all players
  */
 export function updateScoreboard(data: ScoreboardData): void {
@@ -118,20 +130,22 @@ export function updateScoreboard(data: ScoreboardData): void {
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
 
+        const vipStatus = getVipStatus(playerId, data.teamVipById);
         const playerVipKills = data.playerVipKillsById.get(playerId) ?? 0;
         const playerKills = data.playerKillsById.get(playerId) ?? 0;
         const playerDeaths = data.playerDeathsById.get(playerId) ?? 0;
         const sortingNumber = calculateSortingNumber(playerId, teamId, teamRanks, data);
 
         // Set scoreboard values for this player
-        // Columns: Team ID, VIP Kills, Kills, Deaths, Sorting Number
+        // Columns: Team ID, VIP Status (1 or 0), VIP Kills, Kills, Deaths, Sorting Number
         mod.SetScoreboardPlayerValues(
             player,
             teamId, // Column 1: Team ID
-            playerVipKills, // Column 2: VIP Kills
-            playerKills, // Column 3: Total Kills
-            playerDeaths, // Column 4: Deaths
-            sortingNumber // Column 5: Hidden sorting number
+            vipStatus, // Column 2: VIP Status (1 = VIP, 0 = not VIP)
+            playerVipKills, // Column 3: VIP Kills
+            playerKills, // Column 4: Total Kills
+            playerDeaths, // Column 5: Deaths
+            sortingNumber // Column 6: Hidden sorting number
         );
     }
 }
