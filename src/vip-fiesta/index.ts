@@ -3,7 +3,7 @@ import { CONFIG } from './config.ts';
 import { refreshSpotsForObserver, updateIconDistancesForObserver } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 import { handlePlayerDied } from './scoring.ts';
-import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
+import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
 
 export class VIPFiesta {
     private teamVipById: Map<number, number> = new Map();
@@ -22,6 +22,11 @@ export class VIPFiesta {
         ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
+    private teamHasAssignedVip(teamId: number): boolean {
+        const currentVip = this.teamVipById.get(teamId);
+        return currentVip !== undefined && currentVip !== -1;
+    }
+
     ongoingPlayer(player: mod.Player): void {
         // Placeholder: keep minimal to avoid per-tick overhead
         // Intended: maintain 3D markers and minimap spotting for current VIPs
@@ -33,7 +38,7 @@ export class VIPFiesta {
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
 
-        if (!this.teamVipById.has(teamId)) {
+        if (!this.teamHasAssignedVip(teamId)) {
             this.assignVipForTeam(team);
         }
 
@@ -98,35 +103,59 @@ export class VIPFiesta {
                 this.gameEnded = ended;
             }
         );
-        
+
         // Update scoreboard after death processing
         this.updateScoreboardValues();
     }
 
     onPlayerJoinGame(player: mod.Player): void {
+        // Initialize maps to include this player/team
+        ensureScoreboardMapsInitialized({
+            teamVipById: this.teamVipById,
+            vipKillsByTeamId: this.vipKillsByTeamId,
+            playerVipKillsById: this.playerVipKillsById,
+            playerKillsById: this.playerKillsById,
+            playerDeathsById: this.playerDeathsById,
+        });
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
-        if (!this.teamVipById.has(teamId)) {
+        if (!this.teamHasAssignedVip(teamId)) {
             this.assignVipForTeam(team);
         }
-        
+
         // Update scoreboard when player joins
         this.updateScoreboardValues();
     }
 
     onPlayerLeaveGame(playerId: number): void {
+        // Initialize/prune maps after player leaves
+        ensureScoreboardMapsInitialized({
+            teamVipById: this.teamVipById,
+            vipKillsByTeamId: this.vipKillsByTeamId,
+            playerVipKillsById: this.playerVipKillsById,
+            playerKillsById: this.playerKillsById,
+            playerDeathsById: this.playerDeathsById,
+        });
         // If a leaving player was a VIP, clear their team VIP slot
         for (const [teamId, vipId] of this.teamVipById.entries()) {
             if (vipId === playerId) {
                 this.teamVipById.delete(teamId);
             }
         }
-        
+
         // Update scoreboard when player leaves
         this.updateScoreboardValues();
     }
 
     onPlayerSwitchTeam(player: mod.Player, newTeam: mod.Team): void {
+        // Initialize/prune maps around the team switch
+        ensureScoreboardMapsInitialized({
+            teamVipById: this.teamVipById,
+            vipKillsByTeamId: this.vipKillsByTeamId,
+            playerVipKillsById: this.playerVipKillsById,
+            playerKillsById: this.playerKillsById,
+            playerDeathsById: this.playerDeathsById,
+        });
         const playerId = mod.GetObjId(player);
         // Remove VIP assignment from old team if this player was the VIP
         for (const [teamId, vipId] of this.teamVipById.entries()) {
@@ -137,10 +166,10 @@ export class VIPFiesta {
 
         // Ensure new team has a VIP
         const newTeamId = mod.GetObjId(newTeam);
-        if (!this.teamVipById.has(newTeamId)) {
+        if (!this.teamHasAssignedVip(newTeamId)) {
             this.assignVipForTeam(newTeam);
         }
-        
+
         // Update scoreboard when player switches team
         this.updateScoreboardValues();
     }
@@ -170,7 +199,7 @@ export class VIPFiesta {
 
         // Notify the new VIP
         ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), newVip);
-        
+
         // Update scoreboard when VIP changes
         this.updateScoreboardValues();
     }
