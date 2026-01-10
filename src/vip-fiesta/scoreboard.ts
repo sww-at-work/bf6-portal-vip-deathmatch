@@ -32,17 +32,18 @@ export function initializeScoreboard(): void {
     mod.SetScoreboardType(mod.ScoreboardType.CustomFFA);
 
     // Configure column names
-    // Columns: Team, VIP Status, VIP Kills, Kills, Deaths
+    // Columns: Team, VIP Kills, Kills, Deaths, Sort Order
     mod.SetScoreboardColumnNames(
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColTeam),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColVipKills),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColKills),
         mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColDeaths),
-        mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColSortOrder) // Hidden column for sorting
+        mod.Message(mod.stringkeys.vipFiesta.ui.scoreboardColSortOrder)
     );
 
-    // Set column widths (team, vipKills, kills, deaths, sortOrder)
-    mod.SetScoreboardColumnWidths(10, 15, 15, 15, 1);
+    // Set column widths as percentages (must total 100%)
+    // Equally distributed: 20% each for all 5 columns
+    mod.SetScoreboardColumnWidths(20, 20, 20, 20, 20);
 
     // Sort by the 5th column (sortOrder) in ascending order
     mod.SetScoreboardSorting(5, false);
