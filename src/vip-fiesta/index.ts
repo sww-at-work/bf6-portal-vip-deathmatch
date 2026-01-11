@@ -1,6 +1,6 @@
 import { getPlayersInTeam, ShowEventGameModeMessage, ShowHighlightedGameModeMessage } from '../modlib/index.ts';
 import { CONFIG } from './config.ts';
-import { spotVipTargetsGlobal } from './spotting.ts';
+import { spotVipTargetsGlobal, removeVipIconForPlayer } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 import { handlePlayerDied } from './scoring.ts';
 import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
@@ -99,6 +99,10 @@ export class VIPFiesta {
                 this.gameEnded = ended;
             }
         );
+
+        // Ensure any icon attached to the dead player's soldier is removed
+        // (VIP markers attach to the VIP's object with team-scoped visibility)
+        removeVipIconForPlayer(player);
 
         // Update scoreboard after death processing
         this.updateScoreboardValues();
