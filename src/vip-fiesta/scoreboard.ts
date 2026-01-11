@@ -42,8 +42,8 @@ export function initializeScoreboard(): void {
     );
 
     // Set column widths as percentages (must total 100%)
-    // Equally distributed: 20% each for all 5 columns
-    mod.SetScoreboardColumnWidths(20, 20, 20, 20, 20);
+    // Equally distributed: 25% each for main 4 columns and 0% for 5th column
+    mod.SetScoreboardColumnWidths(25, 25, 25, 25, 0);
 
     /* Sort by the 5th column (sortOrder) in ascending order 
        (reverse sorting is set to true as the scoreboard sorts highest to lowest by default) 

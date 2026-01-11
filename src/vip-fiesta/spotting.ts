@@ -43,7 +43,16 @@ export function spotVipTargetsGlobal(teamVipById: Map<number, number>): void {
     }
 
     for (const vip of vipPlayers) {
-        // Spot for all players for 1 second; called every tick to keep active
-        mod.SpotTarget(vip, 1);
+        if (mod.GetSoldierState(vip, mod.SoldierStateBool.IsAlive) || mod.GetSoldierState(vip, mod.SoldierStateBool.IsManDown)) {
+            // Spot for all players for 1 second; called every tick to keep active
+            mod.SpotTarget(vip, 1);
+
+            // Additionally, add a skull icon above VIPs for easy identification
+            mod.AddUIIcon(vip, mod.WorldIconImages.Skull, 4, mod.CreateVector(255, 1, 1), mod.Message(mod.stringkeys.vipFiesta.ui.vipMarker));
+        } else {
+            // Remove any existing UI icon if VIP is dead
+            mod.RemoveUIIcon(vip);
+        }
+
     }
 }
