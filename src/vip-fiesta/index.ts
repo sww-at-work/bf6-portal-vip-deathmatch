@@ -1,6 +1,6 @@
 import { getPlayersInTeam, ShowEventGameModeMessage, ShowHighlightedGameModeMessage } from '../modlib/index.ts';
 import { CONFIG } from './config.ts';
-import { spotVipTargetsGlobal, removeVipIconForPlayer } from './spotting.ts';
+import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 import { handlePlayerDied } from './scoring.ts';
 import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
@@ -33,12 +33,14 @@ export class VIPFiesta {
     }
 
     ongoingGlobal(): void {
-        // Central VIP spotting for all players (minimap + 3D), throttled to 1s
+        // Central VIP spotting for all players (minimap ping throttled; 3D marker moved every tick)
         const now = Date.now();
         if (now - this.lastGlobalSpotAt >= 1000) {
             spotVipTargetsGlobal(this.teamVipById);
             this.lastGlobalSpotAt = now;
         }
+        // Update WorldIcon positions smoothly every tick
+        updateVipWorldIcons(this.teamVipById);
     }
 
     onPlayerDeployed(player: mod.Player): void {
@@ -143,6 +145,9 @@ export class VIPFiesta {
             }
         }
 
+        // Remove any icon bound to the leaving player
+        removeVipIconForPlayerId(playerId);
+
         // Update scoreboard when player leaves
         this.updateScoreboardValues();
     }
@@ -169,6 +174,9 @@ export class VIPFiesta {
         if (!this.teamHasAssignedVip(newTeamId)) {
             this.assignVipForTeam(newTeam);
         }
+
+        // Remove any icon tied to the switching player; will recreate if they remain VIP
+        removeVipIconForPlayer(player);
 
         // Update scoreboard when player switches team
         this.updateScoreboardValues();
