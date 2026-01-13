@@ -155,16 +155,8 @@ export class VIPFiesta {
             // Track individual player VIP kills
             gameState.playerVipKillsById.set(killerId, (gameState.playerVipKillsById.get(killerId) ?? 0) + 1);
 
-            // Notify the killer about the VIP elimination and team progress
+            // Compute updated team VIP kill count for messaging
             const killerTeamKills = gameState.vipKillsByTeamId.get(killerTeamId) ?? 0;
-            mod.DisplayHighlightedWorldLogMessage(
-                mod.Message(
-                    mod.stringkeys.vipFiesta.notifications.vipKilled,
-                    killerTeamKills,
-                    CONFIG.targetVipKills
-                ),
-                other
-            );
 
             // Notify the killer's team and include the killer in the message
             mod.DisplayHighlightedWorldLogMessage(
