@@ -3,12 +3,15 @@ import { CONFIG } from './config.ts';
 import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
-import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
+import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
+import { syncGameStateFromPlayers } from './state.ts';
 import { gameState } from './state.ts';
 
 export class VIPFiesta {
 
     initialize(): void {
+        // Sync initial roster and teams at game start
+        syncGameStateFromPlayers();
         initializeScoreboard();
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
@@ -79,6 +82,8 @@ export class VIPFiesta {
 
 
     onPlayerDied(player: mod.Player, other: mod.Player): void {
+        // Keep game state aligned with current roster
+        syncGameStateFromPlayers();
         // Handle suicides or deaths without a valid killer (redeploy/deserting)
         try {
             if (!other) {
@@ -170,7 +175,7 @@ export class VIPFiesta {
 
     onPlayerJoinGame(player: mod.Player): void {
         // Initialize maps to include this player/team
-        ensureScoreboardMapsInitialized();
+        syncGameStateFromPlayers();
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
         if (!this.teamHasAssignedVip(teamId)) {
@@ -183,7 +188,7 @@ export class VIPFiesta {
 
     onPlayerLeaveGame(playerId: number): void {
         // Initialize/prune maps after player leaves
-        ensureScoreboardMapsInitialized();
+        syncGameStateFromPlayers();
         // If a leaving player was a VIP, clear their team VIP slot
         for (const [teamId, vipId] of gameState.teamVipById.entries()) {
             if (vipId === playerId) {
@@ -200,7 +205,7 @@ export class VIPFiesta {
 
     onPlayerSwitchTeam(player: mod.Player, newTeam: mod.Team): void {
         // Initialize/prune maps around the team switch
-        ensureScoreboardMapsInitialized();
+        syncGameStateFromPlayers();
         const playerId = mod.GetObjId(player);
         // Remove VIP assignment from old team if this player was the VIP
         for (const [teamId, vipId] of gameState.teamVipById.entries()) {

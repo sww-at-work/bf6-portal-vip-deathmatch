@@ -114,8 +114,6 @@ function calculateTeamRanks(): Map<number, number> {
  * Update scoreboard values for all players
  */
 export function updateScoreboard(): void {
-    // Ensure maps contain current team/player IDs before computing ranks
-    ensureScoreboardMapsInitialized();
     // Calculate team ranks purely from vipKillsByTeamId; ties broken by team ID
     const teamRanks = calculateTeamRanks();
 
@@ -163,55 +161,5 @@ export function updateScoreboard(): void {
             playerDeaths, // Column 4: Deaths
             sortingNumber // Column 5: Hidden sorting number
         );
-    }
-}
-
-/**
- * Ensure scoreboard-related maps are initialized for all current players and teams.
- * Call this when players join, leave, or switch teams to keep maps in sync.
- */
-export function ensureScoreboardMapsInitialized(): void {
-    const allPlayers = mod.AllPlayers();
-    const playerCount = mod.CountOf(allPlayers);
-
-    const seenPlayerIds = new Set<number>();
-    const seenTeamIds = new Set<number>();
-
-    for (let i = 0; i < playerCount; i++) {
-        const player = mod.ValueInArray(allPlayers, i) as mod.Player;
-        const playerId = mod.GetObjId(player);
-        const team = mod.GetTeam(player);
-        const teamId = mod.GetObjId(team);
-
-        seenPlayerIds.add(playerId);
-        seenTeamIds.add(teamId);
-
-        // Initialize player-scoped maps
-        if (!gameState.playerVipKillsById.has(playerId)) gameState.playerVipKillsById.set(playerId, 0);
-        if (!gameState.playerKillsById.has(playerId)) gameState.playerKillsById.set(playerId, 0);
-        if (!gameState.playerDeathsById.has(playerId)) gameState.playerDeathsById.set(playerId, 0);
-
-        // Initialize team-scoped maps
-        if (!gameState.vipKillsByTeamId.has(teamId)) gameState.vipKillsByTeamId.set(teamId, 0);
-        if (!gameState.teamVipById.has(teamId)) gameState.teamVipById.set(teamId, -1); // -1 indicates no VIP assigned yet
-    }
-
-    // Prune players no longer present
-    for (const pid of Array.from(gameState.playerVipKillsById.keys())) {
-        if (!seenPlayerIds.has(pid)) gameState.playerVipKillsById.delete(pid);
-    }
-    for (const pid of Array.from(gameState.playerKillsById.keys())) {
-        if (!seenPlayerIds.has(pid)) gameState.playerKillsById.delete(pid);
-    }
-    for (const pid of Array.from(gameState.playerDeathsById.keys())) {
-        if (!seenPlayerIds.has(pid)) gameState.playerDeathsById.delete(pid);
-    }
-
-    // Optionally prune teams not currently represented (keeps maps tidy)
-    for (const tid of Array.from(gameState.vipKillsByTeamId.keys())) {
-        if (!seenTeamIds.has(tid)) gameState.vipKillsByTeamId.delete(tid);
-    }
-    for (const tid of Array.from(gameState.teamVipById.keys())) {
-        if (!seenTeamIds.has(tid)) gameState.teamVipById.delete(tid);
     }
 }
