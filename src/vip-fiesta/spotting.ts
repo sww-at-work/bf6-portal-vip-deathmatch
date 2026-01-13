@@ -23,7 +23,7 @@ function ensureVipWorldIcon(vip: mod.Player): void {
     );
 
     // Configure icon
-    mod.SetWorldIconImage(worldicon, mod.WorldIconImages.Skull);
+    mod.SetWorldIconImage(worldicon, CONFIG.markers.enemyIconImage);
     mod.SetWorldIconColor(worldicon, CONFIG.markers.enemyColorRGB);
     // Globally visible: do NOT set owner
     mod.SetWorldIconPosition(worldicon, spawnPos);
