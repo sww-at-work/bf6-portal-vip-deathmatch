@@ -1,19 +1,16 @@
 import { CONFIG } from './config.ts';
+import { gameState } from './state.ts';
 
-export function selectVipForTeam(
-    members: mod.Player[],
-    playerKillsById: Map<number, number>,
-    playerDeathsById: Map<number, number>
-): mod.Player {
+export function selectVipForTeam(members: mod.Player[]): mod.Player {
     if (CONFIG.vipSelection === 'topPlayers') {
         const ranked = members
             .slice()
             .sort((a, b) => {
-                const ka = playerKillsById.get(mod.GetObjId(a)) ?? 0;
-                const kb = playerKillsById.get(mod.GetObjId(b)) ?? 0;
+                const ka = gameState.playerKillsById.get(mod.GetObjId(a)) ?? 0;
+                const kb = gameState.playerKillsById.get(mod.GetObjId(b)) ?? 0;
                 if (kb !== ka) return kb - ka;
-                const da = playerDeathsById.get(mod.GetObjId(a)) ?? 0;
-                const db = playerDeathsById.get(mod.GetObjId(b)) ?? 0;
+                const da = gameState.playerDeathsById.get(mod.GetObjId(a)) ?? 0;
+                const db = gameState.playerDeathsById.get(mod.GetObjId(b)) ?? 0;
                 if (da !== db) return da - db;
                 return mod.GetObjId(a) - mod.GetObjId(b);
             });

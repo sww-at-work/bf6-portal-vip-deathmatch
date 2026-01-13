@@ -3,10 +3,6 @@ export interface VipFiestaConfig {
     vipReassignDelaySeconds: number;
     showIntroOnDeploy: boolean;
     onTimeLimitAnnounceWinner: boolean;
-    scoring: {
-        announceOnTargetReached: boolean;
-        stopCountingAfterWin: boolean;
-    };
     vipSelection: 'random' | 'topPlayers';
     topPlayersPoolSize: number;
     ui: {
@@ -29,10 +25,6 @@ export const CONFIG: VipFiestaConfig = {
     vipReassignDelaySeconds: 5,
     showIntroOnDeploy: true,
     onTimeLimitAnnounceWinner: true,
-    scoring: {
-        announceOnTargetReached: true,
-        stopCountingAfterWin: true,
-    },
     vipSelection: 'random',
     topPlayersPoolSize: 3,
     ui: {

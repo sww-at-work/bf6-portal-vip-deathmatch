@@ -16,13 +16,7 @@
  *   3. Deaths (ascending)
  */
 
-export interface ScoreboardData {
-    teamVipById: Map<number, number>;
-    vipKillsByTeamId: Map<number, number>;
-    playerVipKillsById: Map<number, number>;
-    playerKillsById: Map<number, number>;
-    playerDeathsById: Map<number, number>;
-}
+import { gameState } from './state.ts';
 
 /**
  * Initialize the scoreboard with column names and configuration
@@ -67,7 +61,6 @@ function calculateSortingNumber(
     playerId: number,
     teamId: number,
     teamRanks: Map<number, number>,
-    data: ScoreboardData,
     weights: {
         teamWeight: number;
         vipWeight: number;
@@ -80,9 +73,9 @@ function calculateSortingNumber(
     }
 ): number {
     const teamRank = teamRanks.get(teamId) ?? 999;
-    const playerVipKills = data.playerVipKillsById.get(playerId) ?? 0;
-    const playerKills = data.playerKillsById.get(playerId) ?? 0;
-    const playerDeaths = data.playerDeathsById.get(playerId) ?? 0;
+    const playerVipKills = gameState.playerVipKillsById.get(playerId) ?? 0;
+    const playerKills = gameState.playerKillsById.get(playerId) ?? 0;
+    const playerDeaths = gameState.playerDeathsById.get(playerId) ?? 0;
 
     // Hierarchical weighting using dynamic ranges to keep the number smaller
     const teamComponent = teamRank * weights.teamWeight;
@@ -98,11 +91,11 @@ function calculateSortingNumber(
  * Calculate team ranks based on VIP kills
  * Teams with more VIP kills get lower rank numbers (rank 1 is best)
  */
-function calculateTeamRanks(vipKillsByTeamId: Map<number, number>): Map<number, number> {
+function calculateTeamRanks(): Map<number, number> {
     const teamRanks = new Map<number, number>();
 
     // Sort teams by VIP kills descending
-    const sortedTeams = Array.from(vipKillsByTeamId.entries()).sort((a, b) => {
+    const sortedTeams = Array.from(gameState.vipKillsByTeamId.entries()).sort((a, b) => {
         const killsA = a[1];
         const killsB = b[1];
         if (killsB !== killsA) return killsB - killsA; // More kills = better rank
@@ -120,19 +113,19 @@ function calculateTeamRanks(vipKillsByTeamId: Map<number, number>): Map<number, 
 /**
  * Update scoreboard values for all players
  */
-export function updateScoreboard(data: ScoreboardData): void {
+export function updateScoreboard(): void {
     // Ensure maps contain current team/player IDs before computing ranks
-    ensureScoreboardMapsInitialized(data);
+    ensureScoreboardMapsInitialized();
     // Calculate team ranks purely from vipKillsByTeamId; ties broken by team ID
-    const teamRanks = calculateTeamRanks(data.vipKillsByTeamId);
+    const teamRanks = calculateTeamRanks();
 
     // Compute dynamic ranges for compact sort numbers
     let maxVipKills = 0;
-    for (const v of data.playerVipKillsById.values()) maxVipKills = Math.max(maxVipKills, v);
+    for (const v of gameState.playerVipKillsById.values()) maxVipKills = Math.max(maxVipKills, v);
     let maxKills = 0;
-    for (const v of data.playerKillsById.values()) maxKills = Math.max(maxKills, v);
+    for (const v of gameState.playerKillsById.values()) maxKills = Math.max(maxKills, v);
     let maxDeaths = 0;
-    for (const v of data.playerDeathsById.values()) maxDeaths = Math.max(maxDeaths, v);
+    for (const v of gameState.playerDeathsById.values()) maxDeaths = Math.max(maxDeaths, v);
 
     const vipRange = Math.max(1, maxVipKills + 1);
     const killsRange = Math.max(1, maxKills + 1);
@@ -155,10 +148,10 @@ export function updateScoreboard(data: ScoreboardData): void {
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
 
-        const playerVipKills = data.playerVipKillsById.get(playerId) ?? 0;
-        const playerKills = data.playerKillsById.get(playerId) ?? 0;
-        const playerDeaths = data.playerDeathsById.get(playerId) ?? 0;
-        const sortingNumber = calculateSortingNumber(playerId, teamId, teamRanks, data, weights);
+        const playerVipKills = gameState.playerVipKillsById.get(playerId) ?? 0;
+        const playerKills = gameState.playerKillsById.get(playerId) ?? 0;
+        const playerDeaths = gameState.playerDeathsById.get(playerId) ?? 0;
+        const sortingNumber = calculateSortingNumber(playerId, teamId, teamRanks, weights);
 
         // Set scoreboard values for this player
         // Columns: Team ID, VIP Kills, Kills, Deaths, Sorting Number
@@ -177,7 +170,7 @@ export function updateScoreboard(data: ScoreboardData): void {
  * Ensure scoreboard-related maps are initialized for all current players and teams.
  * Call this when players join, leave, or switch teams to keep maps in sync.
  */
-export function ensureScoreboardMapsInitialized(data: ScoreboardData): void {
+export function ensureScoreboardMapsInitialized(): void {
     const allPlayers = mod.AllPlayers();
     const playerCount = mod.CountOf(allPlayers);
 
@@ -194,31 +187,31 @@ export function ensureScoreboardMapsInitialized(data: ScoreboardData): void {
         seenTeamIds.add(teamId);
 
         // Initialize player-scoped maps
-        if (!data.playerVipKillsById.has(playerId)) data.playerVipKillsById.set(playerId, 0);
-        if (!data.playerKillsById.has(playerId)) data.playerKillsById.set(playerId, 0);
-        if (!data.playerDeathsById.has(playerId)) data.playerDeathsById.set(playerId, 0);
+        if (!gameState.playerVipKillsById.has(playerId)) gameState.playerVipKillsById.set(playerId, 0);
+        if (!gameState.playerKillsById.has(playerId)) gameState.playerKillsById.set(playerId, 0);
+        if (!gameState.playerDeathsById.has(playerId)) gameState.playerDeathsById.set(playerId, 0);
 
         // Initialize team-scoped maps
-        if (!data.vipKillsByTeamId.has(teamId)) data.vipKillsByTeamId.set(teamId, 0);
-        if (!data.teamVipById.has(teamId)) data.teamVipById.set(teamId, -1); // -1 indicates no VIP assigned yet
+        if (!gameState.vipKillsByTeamId.has(teamId)) gameState.vipKillsByTeamId.set(teamId, 0);
+        if (!gameState.teamVipById.has(teamId)) gameState.teamVipById.set(teamId, -1); // -1 indicates no VIP assigned yet
     }
 
     // Prune players no longer present
-    for (const pid of Array.from(data.playerVipKillsById.keys())) {
-        if (!seenPlayerIds.has(pid)) data.playerVipKillsById.delete(pid);
+    for (const pid of Array.from(gameState.playerVipKillsById.keys())) {
+        if (!seenPlayerIds.has(pid)) gameState.playerVipKillsById.delete(pid);
     }
-    for (const pid of Array.from(data.playerKillsById.keys())) {
-        if (!seenPlayerIds.has(pid)) data.playerKillsById.delete(pid);
+    for (const pid of Array.from(gameState.playerKillsById.keys())) {
+        if (!seenPlayerIds.has(pid)) gameState.playerKillsById.delete(pid);
     }
-    for (const pid of Array.from(data.playerDeathsById.keys())) {
-        if (!seenPlayerIds.has(pid)) data.playerDeathsById.delete(pid);
+    for (const pid of Array.from(gameState.playerDeathsById.keys())) {
+        if (!seenPlayerIds.has(pid)) gameState.playerDeathsById.delete(pid);
     }
 
     // Optionally prune teams not currently represented (keeps maps tidy)
-    for (const tid of Array.from(data.vipKillsByTeamId.keys())) {
-        if (!seenTeamIds.has(tid)) data.vipKillsByTeamId.delete(tid);
+    for (const tid of Array.from(gameState.vipKillsByTeamId.keys())) {
+        if (!seenTeamIds.has(tid)) gameState.vipKillsByTeamId.delete(tid);
     }
-    for (const tid of Array.from(data.teamVipById.keys())) {
-        if (!seenTeamIds.has(tid)) data.teamVipById.delete(tid);
+    for (const tid of Array.from(gameState.teamVipById.keys())) {
+        if (!seenTeamIds.has(tid)) gameState.teamVipById.delete(tid);
     }
 }

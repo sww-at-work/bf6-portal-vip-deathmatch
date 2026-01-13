@@ -1,28 +1,20 @@
-import { getPlayersInTeam, ShowEventGameModeMessage, ShowHighlightedGameModeMessage } from '../modlib/index.ts';
+import { getPlayersInTeam } from '../modlib/index.ts';
 import { CONFIG } from './config.ts';
 import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
-import { handlePlayerDied } from './scoring.ts';
+// Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard, ensureScoreboardMapsInitialized } from './scoreboard.ts';
+import { gameState } from './state.ts';
 
 export class VIPFiesta {
-    private teamVipById: Map<number, number> = new Map();
-    private vipKillsByTeamId: Map<number, number> = new Map();
-    private firstDeployByPlayerId: Set<number> = new Set();
-    private gameEnded = false;
-    private playerKillsById: Map<number, number> = new Map();
-    private playerDeathsById: Map<number, number> = new Map();
-    private playerVipKillsById: Map<number, number> = new Map();
-    private vipSpottingShownFor: Map<number, { youAreVip: boolean }> = new Map();
-    private lastGlobalSpotAt = 0;
 
     initialize(): void {
         initializeScoreboard();
-        ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
     private teamHasAssignedVip(teamId: number): boolean {
-        const currentVip = this.teamVipById.get(teamId);
+        const currentVip = gameState.teamVipById.get(teamId);
         return currentVip !== undefined && currentVip !== -1;
     }
 
@@ -35,12 +27,12 @@ export class VIPFiesta {
     ongoingGlobal(): void {
         // Central VIP spotting for all players (minimap ping throttled; 3D marker moved every tick)
         const now = Date.now();
-        if (now - this.lastGlobalSpotAt >= 1000) {
-            spotVipTargetsGlobal(this.teamVipById);
-            this.lastGlobalSpotAt = now;
+        if (now - gameState.lastGlobalSpotAt >= 1000) {
+            spotVipTargetsGlobal();
+            gameState.lastGlobalSpotAt = now;
         }
         // Update WorldIcon positions smoothly every tick
-        updateVipWorldIcons(this.teamVipById);
+        updateVipWorldIcons();
     }
 
     onPlayerDeployed(player: mod.Player): void {
@@ -53,16 +45,16 @@ export class VIPFiesta {
 
         if (CONFIG.showIntroOnDeploy) {
             const pid = mod.GetObjId(player);
-            if (!this.firstDeployByPlayerId.has(pid)) {
-                this.firstDeployByPlayerId.add(pid);
-                ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting), player);
+            if (!gameState.firstDeployByPlayerId.has(pid)) {
+                gameState.firstDeployByPlayerId.add(pid);
+                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting), player);
             }
         }
 
         // Notify player if they are the VIP
-        const vipId = this.teamVipById.get(teamId);
+        const vipId = gameState.teamVipById.get(teamId);
         if (vipId !== undefined && vipId === mod.GetObjId(player)) {
-            ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
         }
     }
 
@@ -71,36 +63,41 @@ export class VIPFiesta {
         const playerTeamId = mod.GetObjId(mod.GetTeam(player));
 
         // Edge-message on becoming VIP
-        const teamVipId = this.teamVipById.get(playerTeamId);
+        const teamVipId = gameState.teamVipById.get(playerTeamId);
         const isVip = teamVipId !== undefined && teamVipId === playerId;
-        const state = this.vipSpottingShownFor.get(playerId) ?? { youAreVip: false };
+        const state = gameState.vipSpottingShownFor.get(playerId) ?? { youAreVip: false };
         if (isVip && !state.youAreVip) {
-            ShowHighlightedGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
             state.youAreVip = true;
         } else if (!isVip && state.youAreVip) {
             state.youAreVip = false;
         }
-        this.vipSpottingShownFor.set(playerId, state);
+        gameState.vipSpottingShownFor.set(playerId, state);
 
         // Observer-based spotting reserved for future; do not spot per-player here
     }
 
 
     onPlayerDied(player: mod.Player, other: mod.Player): void {
-        handlePlayerDied(
-            player,
-            other,
-            this.teamVipById,
-            this.vipKillsByTeamId,
-            this.playerKillsById,
-            this.playerDeathsById,
-            this.playerVipKillsById,
-            (team) => this.assignVipForTeam(team),
-            () => this.gameEnded,
-            (ended) => {
-                this.gameEnded = ended;
+        // Handle suicides or deaths without a valid killer (redeploy/deserting)
+        try {
+            if (!other) {
+                this.handleSuicide(player);
+                return;
             }
-        );
+            const playerId = mod.GetObjId(player);
+            const otherId = mod.GetObjId(other);
+            if (playerId === otherId) {
+                this.handleSuicide(player);
+                return;
+            }
+        } catch {
+            // Defensive: if accessing killer info fails, treat as no-killer case
+            this.handleSuicide(player);
+            return;
+        }
+
+        this.processPlayerDeath(player, other);
 
         // Ensure any icon attached to the dead player's soldier is removed
         // (VIP markers attach to the VIP's object with team-scoped visibility)
@@ -110,15 +107,70 @@ export class VIPFiesta {
         this.updateScoreboardValues();
     }
 
+    private handleSuicide(player: mod.Player): void {
+        const victimId = mod.GetObjId(player);
+        gameState.playerDeathsById.set(victimId, (gameState.playerDeathsById.get(victimId) ?? 0) + 1);
+
+        const victimTeam = mod.GetTeam(player);
+        const victimTeamId = mod.GetObjId(victimTeam);
+        const vipId = gameState.teamVipById.get(victimTeamId);
+
+        // If the victim was the VIP, treat as VIP death without awarding kills
+        if (vipId !== undefined && vipId === victimId) {
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
+            gameState.teamVipById.delete(victimTeamId);
+            (async () => {
+                await mod.Wait(CONFIG.vipReassignDelaySeconds);
+                this.assignVipForTeam(victimTeam);
+            })();
+        }
+
+        // Clean up any world icons tied to the dead player and refresh scoreboard
+        removeVipIconForPlayer(player);
+        this.updateScoreboardValues();
+    }
+
+    private processPlayerDeath(player: mod.Player, other: mod.Player): void {
+        if (gameState.gameEnded) return;
+
+        const killerId = mod.GetObjId(other);
+        const victimId = mod.GetObjId(player);
+        gameState.playerKillsById.set(killerId, (gameState.playerKillsById.get(killerId) ?? 0) + 1);
+        gameState.playerDeathsById.set(victimId, (gameState.playerDeathsById.get(victimId) ?? 0) + 1);
+
+        const victimTeam = mod.GetTeam(player);
+        const victimTeamId = mod.GetObjId(victimTeam);
+        const vipId = gameState.teamVipById.get(victimTeamId);
+
+        if (vipId !== undefined && vipId === victimId) {
+            const killerTeam = mod.GetTeam(other);
+            const killerTeamId = mod.GetObjId(killerTeam);
+            gameState.vipKillsByTeamId.set(killerTeamId, (gameState.vipKillsByTeamId.get(killerTeamId) ?? 0) + 1);
+
+            // Track individual player VIP kills
+            gameState.playerVipKillsById.set(killerId, (gameState.playerVipKillsById.get(killerId) ?? 0) + 1);
+
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
+
+            gameState.teamVipById.delete(victimTeamId);
+
+            (async () => {
+                await mod.Wait(CONFIG.vipReassignDelaySeconds);
+                this.assignVipForTeam(victimTeam);
+            })();
+
+            const killerTeamKills = gameState.vipKillsByTeamId.get(killerTeamId) ?? 0;
+            if (killerTeamKills >= CONFIG.targetVipKills) {
+                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+                gameState.gameEnded = true;
+                mod.EndGameMode(killerTeam);
+            }
+        }
+    }
+
     onPlayerJoinGame(player: mod.Player): void {
         // Initialize maps to include this player/team
-        ensureScoreboardMapsInitialized({
-            teamVipById: this.teamVipById,
-            vipKillsByTeamId: this.vipKillsByTeamId,
-            playerVipKillsById: this.playerVipKillsById,
-            playerKillsById: this.playerKillsById,
-            playerDeathsById: this.playerDeathsById,
-        });
+        ensureScoreboardMapsInitialized();
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
         if (!this.teamHasAssignedVip(teamId)) {
@@ -131,17 +183,11 @@ export class VIPFiesta {
 
     onPlayerLeaveGame(playerId: number): void {
         // Initialize/prune maps after player leaves
-        ensureScoreboardMapsInitialized({
-            teamVipById: this.teamVipById,
-            vipKillsByTeamId: this.vipKillsByTeamId,
-            playerVipKillsById: this.playerVipKillsById,
-            playerKillsById: this.playerKillsById,
-            playerDeathsById: this.playerDeathsById,
-        });
+        ensureScoreboardMapsInitialized();
         // If a leaving player was a VIP, clear their team VIP slot
-        for (const [teamId, vipId] of this.teamVipById.entries()) {
+        for (const [teamId, vipId] of gameState.teamVipById.entries()) {
             if (vipId === playerId) {
-                this.teamVipById.delete(teamId);
+                gameState.teamVipById.delete(teamId);
             }
         }
 
@@ -154,18 +200,12 @@ export class VIPFiesta {
 
     onPlayerSwitchTeam(player: mod.Player, newTeam: mod.Team): void {
         // Initialize/prune maps around the team switch
-        ensureScoreboardMapsInitialized({
-            teamVipById: this.teamVipById,
-            vipKillsByTeamId: this.vipKillsByTeamId,
-            playerVipKillsById: this.playerVipKillsById,
-            playerKillsById: this.playerKillsById,
-            playerDeathsById: this.playerDeathsById,
-        });
+        ensureScoreboardMapsInitialized();
         const playerId = mod.GetObjId(player);
         // Remove VIP assignment from old team if this player was the VIP
-        for (const [teamId, vipId] of this.teamVipById.entries()) {
+        for (const [teamId, vipId] of gameState.teamVipById.entries()) {
             if (vipId === playerId) {
-                this.teamVipById.delete(teamId);
+                gameState.teamVipById.delete(teamId);
             }
         }
 
@@ -186,14 +226,14 @@ export class VIPFiesta {
         // Announce winner by VIP kills if any
         let winningTeamId: number | undefined;
         let topKills = -1;
-        for (const [teamId, kills] of this.vipKillsByTeamId.entries()) {
+        for (const [teamId, kills] of gameState.vipKillsByTeamId.entries()) {
             if (kills > topKills) {
                 topKills = kills;
                 winningTeamId = teamId;
             }
         }
         if (winningTeamId !== undefined && CONFIG.onTimeLimitAnnounceWinner) {
-            ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
         }
     }
 
@@ -202,24 +242,21 @@ export class VIPFiesta {
         const members = getPlayersInTeam(team);
         if (members.length === 0) return;
 
-        const newVip = selectVipForTeam(members, this.playerKillsById, this.playerDeathsById);
-        this.teamVipById.set(teamId, mod.GetObjId(newVip));
+        const newVip = selectVipForTeam(members);
+        gameState.teamVipById.set(teamId, mod.GetObjId(newVip));
+
+        // Notify the team that a new VIP has been assigned
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamVipAssigned), team);
 
         // Notify the new VIP
-        ShowEventGameModeMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), newVip);
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), newVip);
 
         // Update scoreboard when VIP changes
         this.updateScoreboardValues();
     }
 
     private updateScoreboardValues(): void {
-        updateScoreboard({
-            teamVipById: this.teamVipById,
-            vipKillsByTeamId: this.vipKillsByTeamId,
-            playerVipKillsById: this.playerVipKillsById,
-            playerKillsById: this.playerKillsById,
-            playerDeathsById: this.playerDeathsById,
-        });
+        updateScoreboard();
     }
 
 

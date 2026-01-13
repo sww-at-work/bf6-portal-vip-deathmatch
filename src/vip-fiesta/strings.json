@@ -19,7 +19,8 @@
       "teamWins": "Team {} wins!",
       "selectingNewVip": "Selecting new VIP...",
       "gameStarting": "VIP Fiesta starting! Hunt the enemy VIPs!",
-      "vipDied": "Your VIP has been killed!"
+      "vipDied": "Your VIP has been killed!",
+      "teamVipAssigned": "Your team's VIP has been assigned."
     },
     "hud": {
       "yourVip": "Your VIP: {}",

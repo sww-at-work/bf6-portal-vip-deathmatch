@@ -1,4 +1,5 @@
 import { CONFIG } from './config.ts';
+import { gameState } from './state.ts';
 
 type VipIconEntry = { icon: mod.WorldIcon; player: mod.Player };
 
@@ -59,7 +60,7 @@ function removeVipWorldIconForPlayer(player: mod.Player): void {
     removeVipWorldIconsByVipId(mod.GetObjId(player));
 }
 
-export function updateVipWorldIcons(teamVipById: Map<number, number>): void {
+export function updateVipWorldIcons(): void {
     if (!CONFIG.markers.enable3DIcons) return;
 
     // Build desired icon keys: for each team, show friendly icon for its VIP and enemy icons for all other VIPs
@@ -85,7 +86,7 @@ export function updateVipWorldIcons(teamVipById: Map<number, number>): void {
     }
 
     // Iterate VIPs
-    for (const [vipTeamId, vipId] of teamVipById.entries()) {
+    for (const [vipTeamId, vipId] of gameState.teamVipById.entries()) {
         if (vipId === -1) continue;
         const vip = findPlayerById(vipId);
         if (!vip) continue;
@@ -124,14 +125,14 @@ export function updateVipWorldIcons(teamVipById: Map<number, number>): void {
     }
 }
 
-export function spotVipTargetsGlobal(teamVipById: Map<number, number>): void {
+export function spotVipTargetsGlobal(): void {
     // Only perform minimap/3D spotting ping if configured
     if (!CONFIG.markers.enableMinimapSpotting) return;
 
     const allPlayers = mod.AllPlayers();
     const count = mod.CountOf(allPlayers);
     const currentVipIds = new Set<number>();
-    for (const [, vipId] of teamVipById.entries()) currentVipIds.add(vipId);
+    for (const [, vipId] of gameState.teamVipById.entries()) currentVipIds.add(vipId);
 
     for (let i = 0; i < count; i++) {
         const p = mod.ValueInArray(allPlayers, i) as mod.Player;

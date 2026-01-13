@@ -22,8 +22,8 @@
 ## Project Conventions
 - Strings: Any on-screen text must be defined in a nearby `strings.json` (the bundler auto-picks files ending in `strings.json`). Missing keys can halt the script at runtime.
 - Ongoing functions: Keep `OngoingGlobal()` and `OngoingPlayer()` minimal; they run 30 times/second.
-- Game-mode messaging: Prefer `ShowEventGameModeMessage()` and `DisplayCustomNotificationMessage()` from [src/modlib/index.ts](src/modlib/index.ts) over Portal’s `DisplayGameModeMessage` (currently unreliable).
-- UI composition: Build HUD using `ParseUI(...)` with JSON-style params; restrict visibility via `teamId` or `playerId` when needed.
+- Game-mode messaging: Prefer `DisplayHighlightedWorldLogMessage`
+- UI composition: Build HUD using functions in mod namespace and NOT `ParseUI(...)` with JSON-style params; restrict visibility via `teamId` or `playerId` when needed.
 - Team utilities: Use `getPlayersInTeam(team)` to target team-wide UI/notifications.
 
 ## Key Files & Patterns

@@ -677,19 +677,19 @@ export function ShowNotificationMessage(msg: mod.Message, target?: mod.Player | 
 export function ClearAllCustomNotificationMessages(target: mod.Player) {
     try {
         ClearCustomNotificationMessage(mod.CustomNotificationSlots.HeaderText, target);
-    } catch {}
+    } catch { }
     try {
         ClearCustomNotificationMessage(mod.CustomNotificationSlots.MessageText1, target);
-    } catch {}
+    } catch { }
     try {
         ClearCustomNotificationMessage(mod.CustomNotificationSlots.MessageText2, target);
-    } catch {}
+    } catch { }
     try {
         ClearCustomNotificationMessage(mod.CustomNotificationSlots.MessageText3, target);
-    } catch {}
+    } catch { }
     try {
         ClearCustomNotificationMessage(mod.CustomNotificationSlots.MessageText4, target);
-    } catch {}
+    } catch { }
 }
 
 export function ClearCustomNotificationMessage(custom: mod.CustomNotificationSlots, target?: mod.Player | mod.Team) {
@@ -717,6 +717,6 @@ export function ClearCustomNotificationMessage(custom: mod.CustomNotificationSlo
             }
         }
     } catch {
-        console.error('Could not clear custom message for specified target(s)');
+        console.log('Could not clear custom message for specified target(s)');
     }
 }
