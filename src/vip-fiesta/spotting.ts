@@ -107,13 +107,11 @@ export function spotVipTargetsGlobal(teamVipById: Map<number, number>): void {
 
 // Helper: remove any icon(s) tied to a player's soldier (UI icon legacy + WorldIcon)
 export function removeVipIconForPlayer(player: mod.Player): void {
-    // Legacy UI icons cleanup (no-op if none)
-    mod.RemoveUIIcon(player);
     // WorldIcon cleanup
     removeVipWorldIconForPlayer(player);
 }
 
 export function removeVipIconForPlayerId(playerId: number): void {
-    // Legacy UI icons cleanup by id is not available; rely on world icon map
+    // Rely on world icon map for cleanup by player id
     removeVipWorldIconByVipId(playerId);
 }
