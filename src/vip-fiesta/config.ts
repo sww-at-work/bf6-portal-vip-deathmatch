@@ -16,8 +16,8 @@ export interface VipFiestaConfig {
         enable3DIcons: boolean;
         enableMinimapSpotting: boolean;
         verticalOffsetMeters: number;
-        enemyColorRGB: { r: number; g: number; b: number };
-        friendlyColorRGB: { r: number; g: number; b: number };
+        enemyColorRGB: mod.Vector;
+        friendlyColorRGB: mod.Vector;
     };
 }
 
@@ -39,7 +39,7 @@ export const CONFIG: VipFiestaConfig = {
         enable3DIcons: true,
         enableMinimapSpotting: true,
         verticalOffsetMeters: 3,
-        enemyColorRGB: { r: 255, g: 0, b: 0 },
-        friendlyColorRGB: { r: 0, g: 170, b: 255 },
+        enemyColorRGB: mod.CreateVector(255, 0, 0),
+        friendlyColorRGB: mod.CreateVector(0, 170, 255),
     },
 };

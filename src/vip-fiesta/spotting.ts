@@ -4,11 +4,6 @@ type VipIconEntry = { icon: mod.WorldIcon; player: mod.Player };
 
 const vipWorldIconsByVipId: Map<number, VipIconEntry> = new Map();
 
-function createColorVector(rgb: { r: number; g: number; b: number }): mod.Vector {
-    // Colors in test.ts used 0-255 component scale
-    return mod.CreateVector(rgb.r, rgb.g, rgb.b);
-}
-
 function vipOffsetPosition(player: mod.Player): mod.Vector {
     const pos = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
     const y = CONFIG.markers.verticalOffsetMeters;
@@ -29,8 +24,7 @@ function ensureVipWorldIcon(vip: mod.Player): void {
 
     // Configure icon
     mod.SetWorldIconImage(worldicon, mod.WorldIconImages.Skull);
-    const color = createColorVector(CONFIG.markers.enemyColorRGB);
-    mod.SetWorldIconColor(worldicon, color);
+    mod.SetWorldIconColor(worldicon, CONFIG.markers.enemyColorRGB);
     // Globally visible: do NOT set owner
     mod.SetWorldIconPosition(worldicon, spawnPos);
     mod.EnableWorldIconImage(worldicon, true);
