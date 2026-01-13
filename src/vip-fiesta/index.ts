@@ -155,6 +155,28 @@ export class VIPFiesta {
             // Track individual player VIP kills
             gameState.playerVipKillsById.set(killerId, (gameState.playerVipKillsById.get(killerId) ?? 0) + 1);
 
+            // Notify the killer about the VIP elimination and team progress
+            const killerTeamKills = gameState.vipKillsByTeamId.get(killerTeamId) ?? 0;
+            mod.DisplayHighlightedWorldLogMessage(
+                mod.Message(
+                    mod.stringkeys.vipFiesta.notifications.vipKilled,
+                    killerTeamKills,
+                    CONFIG.targetVipKills
+                ),
+                other
+            );
+
+            // Notify the killer's team and include the killer in the message
+            mod.DisplayHighlightedWorldLogMessage(
+                mod.Message(
+                    mod.stringkeys.vipFiesta.notifications.vipKilledTeam,
+                    other,
+                    killerTeamKills,
+                    CONFIG.targetVipKills
+                ),
+                killerTeam
+            );
+
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
 
             gameState.teamVipById.delete(victimTeamId);
@@ -164,7 +186,6 @@ export class VIPFiesta {
                 this.assignVipForTeam(victimTeam);
             })();
 
-            const killerTeamKills = gameState.vipKillsByTeamId.get(killerTeamId) ?? 0;
             if (killerTeamKills >= CONFIG.targetVipKills) {
                 mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
                 gameState.gameEnded = true;
@@ -250,8 +271,8 @@ export class VIPFiesta {
         const newVip = selectVipForTeam(members);
         gameState.teamVipById.set(teamId, mod.GetObjId(newVip));
 
-        // Notify the team that a new VIP has been assigned
-        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamVipAssigned), team);
+        // Notify the team with the new VIP's name
+        mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.newVip, newVip), team);
 
         // Notify the new VIP
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), newVip);
