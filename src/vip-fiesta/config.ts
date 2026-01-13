@@ -15,6 +15,7 @@ export interface VipFiestaConfig {
     markers: {
         enable3DIcons: boolean;
         enableMinimapSpotting: boolean;
+        enableEnemyIcons: boolean;
         verticalOffsetMeters: number;
         enemyIconImage: mod.WorldIconImages;
         friendlyIconImage: mod.WorldIconImages;
@@ -40,6 +41,7 @@ export const CONFIG: VipFiestaConfig = {
     markers: {
         enable3DIcons: true,
         enableMinimapSpotting: true,
+        enableEnemyIcons: true,
         verticalOffsetMeters: 3,
         enemyIconImage: mod.WorldIconImages.Skull,
         friendlyIconImage: mod.WorldIconImages.Triangle,

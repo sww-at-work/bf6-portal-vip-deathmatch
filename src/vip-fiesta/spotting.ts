@@ -2,7 +2,12 @@ import { CONFIG } from './config.ts';
 
 type VipIconEntry = { icon: mod.WorldIcon; player: mod.Player };
 
-const vipWorldIconsByVipId: Map<number, VipIconEntry> = new Map();
+// Keyed by `${ownerTeamId}:${vipId}` to support per-team visibility and styling
+const vipWorldIconsByTeamVipKey: Map<string, VipIconEntry> = new Map();
+
+function teamVipKey(ownerTeamId: number, vipId: number): string {
+    return ownerTeamId + ':' + vipId;
+}
 
 function vipOffsetPosition(player: mod.Player): mod.Vector {
     const pos = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
@@ -11,9 +16,11 @@ function vipOffsetPosition(player: mod.Player): mod.Vector {
     return mod.Add(pos, mod.CreateVector(0, y, 0));
 }
 
-function ensureVipWorldIcon(vip: mod.Player): void {
+function ensureVipWorldIconForTeam(vip: mod.Player, ownerTeam: mod.Team, friendly: boolean): void {
     const vipId = mod.GetObjId(vip);
-    if (vipWorldIconsByVipId.has(vipId)) return;
+    const ownerTeamId = mod.GetObjId(ownerTeam);
+    const key = teamVipKey(ownerTeamId, vipId);
+    if (vipWorldIconsByTeamVipKey.has(key)) return;
 
     const spawnPos = vipOffsetPosition(vip);
     const worldicon = mod.SpawnObject(
@@ -22,61 +29,93 @@ function ensureVipWorldIcon(vip: mod.Player): void {
         mod.CreateVector(0, 0, 0)
     );
 
-    // Configure icon
-    mod.SetWorldIconImage(worldicon, CONFIG.markers.enemyIconImage);
-    mod.SetWorldIconColor(worldicon, CONFIG.markers.enemyColorRGB);
-    // Globally visible: do NOT set owner
+    // Configure icon per team visibility and styling
+    const iconImage = friendly ? CONFIG.markers.friendlyIconImage : CONFIG.markers.enemyIconImage;
+    const iconColor = friendly ? CONFIG.markers.friendlyColorRGB : CONFIG.markers.enemyColorRGB;
+    mod.SetWorldIconImage(worldicon, iconImage);
+    mod.SetWorldIconColor(worldicon, iconColor);
+    mod.SetWorldIconOwner(worldicon, ownerTeam);
     mod.SetWorldIconPosition(worldicon, spawnPos);
     mod.EnableWorldIconImage(worldicon, true);
     mod.EnableWorldIconText(worldicon, true);
     // Set text to string key "VIP"
     mod.SetWorldIconText(worldicon, mod.Message(mod.stringkeys.vipFiesta.ui.vipMarker));
 
-    vipWorldIconsByVipId.set(vipId, { icon: worldicon, player: vip });
+    vipWorldIconsByTeamVipKey.set(key, { icon: worldicon, player: vip });
 }
 
-function removeVipWorldIconByVipId(vipId: number): void {
-    const entry = vipWorldIconsByVipId.get(vipId);
-    if (entry) {
-        mod.UnspawnObject(entry.icon);
-        vipWorldIconsByVipId.delete(vipId);
+function removeVipWorldIconsByVipId(vipId: number): void {
+    for (const [key, entry] of Array.from(vipWorldIconsByTeamVipKey.entries())) {
+        const parts = key.split(':');
+        const keyVipId = Number(parts[1]);
+        if (keyVipId === vipId) {
+            mod.UnspawnObject(entry.icon);
+            vipWorldIconsByTeamVipKey.delete(key);
+        }
     }
 }
 
 function removeVipWorldIconForPlayer(player: mod.Player): void {
-    removeVipWorldIconByVipId(mod.GetObjId(player));
+    removeVipWorldIconsByVipId(mod.GetObjId(player));
 }
 
 export function updateVipWorldIcons(teamVipById: Map<number, number>): void {
     if (!CONFIG.markers.enable3DIcons) return;
 
-    // Build current VIP id set
-    const currentVipIds = new Set<number>();
-    for (const [, vipId] of teamVipById.entries()) currentVipIds.add(vipId);
+    // Build desired icon keys: for each team, show friendly icon for its VIP and enemy icons for all other VIPs
+    const desiredKeys = new Set<string>();
+    const allPlayers = mod.AllPlayers();
+    const total = mod.CountOf(allPlayers);
 
-    // Ensure icons exist for all current VIPs
-    const all = mod.AllPlayers();
-    const count = mod.CountOf(all);
-    for (let i = 0; i < count; i++) {
-        const p = mod.ValueInArray(all, i) as mod.Player;
-        const pid = mod.GetObjId(p);
-        if (currentVipIds.has(pid)) {
-            const alive = mod.GetSoldierState(p, mod.SoldierStateBool.IsAlive);
-            if (alive) ensureVipWorldIcon(p);
+    // Map observed team ids to a representative Team object
+    const teamObjById = new Map<number, mod.Team>();
+    for (let i = 0; i < total; i++) {
+        const p = mod.ValueInArray(allPlayers, i) as mod.Player;
+        const t = mod.GetTeam(p);
+        teamObjById.set(mod.GetObjId(t), t);
+    }
+
+    // Helper to find a player object by id
+    function findPlayerById(targetId: number): mod.Player | undefined {
+        for (let i = 0; i < total; i++) {
+            const p = mod.ValueInArray(allPlayers, i) as mod.Player;
+            if (mod.GetObjId(p) === targetId) return p;
+        }
+        return undefined;
+    }
+
+    // Iterate VIPs
+    for (const [vipTeamId, vipId] of teamVipById.entries()) {
+        if (vipId === -1) continue;
+        const vip = findPlayerById(vipId);
+        if (!vip) continue;
+        const alive = mod.GetSoldierState(vip, mod.SoldierStateBool.IsAlive);
+        if (!alive) continue;
+
+        // Ensure icons for every team present
+        for (const [ownerTeamId, ownerTeam] of teamObjById.entries()) {
+            const friendly = ownerTeamId === vipTeamId;
+            if (!friendly && !CONFIG.markers.enableEnemyIcons) continue;
+            const key = teamVipKey(ownerTeamId, vipId);
+            desiredKeys.add(key);
+            ensureVipWorldIconForTeam(vip, ownerTeam, friendly);
         }
     }
 
     // Move or remove existing icons
-    for (const [vipId, entry] of Array.from(vipWorldIconsByVipId.entries())) {
-        // GC icons for players who are no longer VIPs
-        if (!currentVipIds.has(vipId)) {
-            removeVipWorldIconByVipId(vipId);
+    for (const [key, entry] of Array.from(vipWorldIconsByTeamVipKey.entries())) {
+        if (!desiredKeys.has(key)) {
+            mod.UnspawnObject(entry.icon);
+            vipWorldIconsByTeamVipKey.delete(key);
             continue;
         }
         const vip = entry.player;
         const alive = mod.GetSoldierState(vip, mod.SoldierStateBool.IsAlive);
         if (!alive) {
-            removeVipWorldIconByVipId(vipId);
+            // Remove if VIP died
+            const parts = key.split(':');
+            const vipId = Number(parts[1]);
+            removeVipWorldIconsByVipId(vipId);
             continue;
         }
         // Update position with configured vertical offset
@@ -113,5 +152,5 @@ export function removeVipIconForPlayer(player: mod.Player): void {
 
 export function removeVipIconForPlayerId(playerId: number): void {
     // Rely on world icon map for cleanup by player id
-    removeVipWorldIconByVipId(playerId);
+    removeVipWorldIconsByVipId(playerId);
 }
