@@ -4,6 +4,7 @@ import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId,
 import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
+import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer } from './score-ui.ts';
 import { syncGameStateFromPlayers } from './state.ts';
 import { gameState } from './state.ts';
 
@@ -13,6 +14,7 @@ export class VIPFiesta {
         // Sync initial roster and teams at game start
         syncGameStateFromPlayers();
         initializeScoreboard();
+        initializeScoreUI();
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
@@ -195,6 +197,9 @@ export class VIPFiesta {
             this.assignVipForTeam(team);
         }
 
+        // Create score UI for the new player
+        createScoreUIForNewPlayer(player);
+
         // Update scoreboard when player joins
         this.updateScoreboardValues();
     }
@@ -211,6 +216,9 @@ export class VIPFiesta {
 
         // Remove any icon bound to the leaving player
         removeVipIconForPlayerId(playerId);
+
+        // Remove score UI for the leaving player
+        removeScoreUIForPlayer(playerId);
 
         // Update scoreboard when player leaves
         this.updateScoreboardValues();
@@ -275,6 +283,7 @@ export class VIPFiesta {
 
     private updateScoreboardValues(): void {
         updateScoreboard();
+        updateScoreUI();
     }
 
 
