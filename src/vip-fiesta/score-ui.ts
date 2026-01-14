@@ -160,8 +160,9 @@ function updateScoreUIForPlayer(player: mod.Player): void {
         if (existingWidget) {
             try {
                 mod.DeleteUIWidget(existingWidget);
-            } catch {
-                // Widget might already be deleted
+            } catch (error) {
+                // Widget might already be deleted or invalid
+                console.log(`Could not delete widget ${teamEntryKey}:`, error);
             }
             scoreUIWidgets.delete(teamEntryKey);
         }
@@ -291,10 +292,14 @@ function updateScoreUIForPlayer(player: mod.Player): void {
 function getTeamName(teamId: number): string {
     // Map team IDs to string keys
     const teamKey = `team${teamId}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const teamStringKey = (mod.stringkeys.vipFiesta.teams as any)[teamKey];
-    if (teamStringKey) {
-        return mod.FormatMessage(mod.Message(teamStringKey));
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const teamStringKey = (mod.stringkeys.vipFiesta.teams as any)[teamKey];
+        if (teamStringKey) {
+            return mod.FormatMessage(mod.Message(teamStringKey));
+        }
+    } catch {
+        // Fallback if team string key doesn't exist
     }
     return `Team ${teamId}`;
 }
@@ -348,8 +353,9 @@ export function removeScoreUIForPlayer(playerId: number): void {
         if (key.startsWith(widgetPrefix)) {
             try {
                 mod.DeleteUIWidget(widget);
-            } catch {
-                // Widget might already be deleted
+            } catch (error) {
+                // Widget might already be deleted or invalid
+                console.log(`Could not delete widget ${key}:`, error);
             }
             scoreUIWidgets.delete(key);
         }
