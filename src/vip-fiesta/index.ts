@@ -8,6 +8,7 @@ import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScor
 import { initializeHudUI, updateVipStatusWidget, removeHudUIForPlayer } from './hud-ui.ts';
 import { syncGameStateFromPlayers, updateSortedTeamScores } from './state.ts';
 import { gameState } from './state.ts';
+import { initializeAudio, playSoundForTeam, AudioEvent } from './audio.ts';
 
 export class VIPFiesta {
 
@@ -15,6 +16,7 @@ export class VIPFiesta {
         // Sync initial roster and teams at game start
         syncGameStateFromPlayers();
         updateSortedTeamScores();
+        initializeAudio();
         initializeScoreboard();
         initializeScoreUI();
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
@@ -123,7 +125,7 @@ export class VIPFiesta {
         if (vipId !== undefined && vipId === victimId) {
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
             // Play audio cue for friendly VIP death (suicide/accident)
-            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_FriendlyHVTKilled_OneShot2D, 1.0, victimTeam);
+            playSoundForTeam(AudioEvent.FriendlyVipKilled, 1.0, victimTeam);
             gameState.teamVipById.delete(victimTeamId);
             (async () => {
                 await mod.Wait(CONFIG.vipReassignDelaySeconds);
@@ -174,9 +176,9 @@ export class VIPFiesta {
 
             // Play audio cues for VIP kill
             // Killer's team hears "PlayerKilledHVT" sound (they eliminated an enemy VIP)
-            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_PlayerKilledHVT_OneShot2D, 1.0, killerTeam);
+            playSoundForTeam(AudioEvent.EnemyVipKilled, 1.0, killerTeam);
             // Victim's team hears "FriendlyHVTKilled" sound (their VIP was killed)
-            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_FriendlyHVTKilled_OneShot2D, 1.0, victimTeam);
+            playSoundForTeam(AudioEvent.FriendlyVipKilled, 1.0, victimTeam);
 
             gameState.teamVipById.delete(victimTeamId);
 
