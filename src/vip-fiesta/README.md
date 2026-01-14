@@ -18,7 +18,15 @@ The team with the most VIP kills at the end of the match wins.
 ### HUD-UI
 
 - There should be a static UI element showing the current VIP (player name) of your team
-- In case of the current player being the VIP themself, this should be highlighted to the player in the same UI element location (e.g. different color, bold text, or icon - "YOU are the VIP! - Stay alive!")
+- This UI element should be positioned at the top center of the screen with a y-offset of 20
+- The VIP player name should be updated in real-time as VIPs change
+- The text should say "Protect your VIP: [Player Name]", where [Player Name]
+  - is the name of the current VIP of your team
+  - its color matches your team color
+  - is displayed on a new line
+- In case of the current player being the VIP themself, this should be highlighted to the player in the same UI element location
+  - background and text color is green
+  - text is "YOU are the VIP! - Stay alive!"
 
 #### Score UI
 

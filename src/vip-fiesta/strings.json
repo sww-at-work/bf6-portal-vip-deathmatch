@@ -1,10 +1,15 @@
 {
   "vipFiesta": {
     "ui": {
-      "teamScore": "Team {}: {}",
       "targetHeader": "Target VIP Kills: {}",
-      "teamLabel": "{} {}",
-      "teamLabelYou": "{} {} (YOU)",
+      "teamLabel1st": "1st - Team {}",
+      "teamLabel2nd": "2nd - Team {}",
+      "teamLabel3rd": "3rd - Team {}",
+      "teamLabelNth": "{}th - Team {}",
+      "teamLabelYou1st": "1st - Team {} (YOU)",
+      "teamLabelYou2nd": "2nd - Team {} (YOU)",
+      "teamLabelYou3rd": "3rd - Team {} (YOU)",
+      "teamLabelYouNth": "{}th - Team {} (YOU)",
       "plainNumber": "{}",
       "vipMarker": "VIP",
       "distanceMeters": "{}m",
@@ -21,7 +26,7 @@
       "vipKilledTeam": "VIP eliminated by {}! +1 point ({}/{})",
       "teamWins": "Team {} wins!",
       "selectingNewVip": "Selecting new VIP...",
-      "gameStarting": "VIP Fiesta starting! Hunt the enemy VIPs!",
+      "gameStarting": "VIP Fiesta - Hunt the enemy VIPs!",
       "vipDied": "Your VIP has been killed!",
       "teamVipAssigned": "Your team's VIP has been assigned."
     },

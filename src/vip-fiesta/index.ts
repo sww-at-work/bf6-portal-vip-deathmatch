@@ -5,6 +5,7 @@ import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
 import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer } from './score-ui.ts';
+import { initializeHudUI, updateVipStatusWidget, removeHudUIForPlayer } from './hud-ui.ts';
 import { syncGameStateFromPlayers, updateSortedTeamScores } from './state.ts';
 import { gameState } from './state.ts';
 
@@ -49,13 +50,8 @@ export class VIPFiesta {
             this.assignVipForTeam(team);
         }
 
-        if (CONFIG.showIntroOnDeploy) {
-            const pid = mod.GetObjId(player);
-            if (!gameState.firstDeployByPlayerId.has(pid)) {
-                gameState.firstDeployByPlayerId.add(pid);
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting), player);
-            }
-        }
+        // Initialize HUD-UI for player
+        initializeHudUI(player);
 
         // Notify player if they are the VIP
         const vipId = gameState.teamVipById.get(teamId);
@@ -182,7 +178,7 @@ export class VIPFiesta {
             })();
 
             if (killerTeamKills >= CONFIG.targetVipKills) {
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, killerTeamId));
                 gameState.gameEnded = true;
                 mod.EndGameMode(killerTeam);
             }
@@ -220,6 +216,9 @@ export class VIPFiesta {
 
         // Remove score UI for the leaving player
         removeScoreUIForPlayer(playerId);
+
+        // Remove HUD-UI for the leaving player
+        removeHudUIForPlayer(playerId);
 
         // Update scoreboard when player leaves
         this.updateScoreboardValues();
@@ -260,7 +259,7 @@ export class VIPFiesta {
             }
         }
         if (winningTeamId !== undefined && CONFIG.onTimeLimitAnnounceWinner) {
-            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, winningTeamId));
         }
     }
 
@@ -286,7 +285,12 @@ export class VIPFiesta {
         updateSortedTeamScores();
         updateScoreboard();
         updateScoreUI();
+
+        // Update HUD VIP status for all active players
+        const allPlayers = mod.AllPlayers();
+        for (let i = 0; i < mod.CountOf(allPlayers); i++) {
+            const player = mod.ValueInArray(allPlayers, i) as mod.Player;
+            updateVipStatusWidget(player);
+        }
     }
-
-
 }
