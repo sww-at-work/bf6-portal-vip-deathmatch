@@ -1,3 +1,9 @@
+export interface TeamScoreInfo {
+    teamId: number;
+    vipKills: number;
+    rank: number;
+}
+
 export interface GameState {
     teamVipById: Map<number, number>;
     vipKillsByTeamId: Map<number, number>;
@@ -8,6 +14,7 @@ export interface GameState {
     vipSpottingShownFor: Map<number, { youAreVip: boolean }>;
     lastGlobalSpotAt: number;
     gameEnded: boolean;
+    sortedTeamScores: TeamScoreInfo[];
 }
 
 export const gameState: GameState = {
@@ -20,6 +27,7 @@ export const gameState: GameState = {
     vipSpottingShownFor: new Map(),
     lastGlobalSpotAt: 0,
     gameEnded: false,
+    sortedTeamScores: [],
 };
 
 /**
@@ -72,4 +80,29 @@ export function syncGameStateFromPlayers(): void {
     for (const tid of Array.from(gameState.teamVipById.keys())) {
         if (!seenTeamIds.has(tid)) gameState.teamVipById.delete(tid);
     }
+}
+
+/**
+ * Update the sorted team scores cache for performance optimization.
+ * This should be called whenever team scores change.
+ */
+export function updateSortedTeamScores(): void {
+    const teamScores: TeamScoreInfo[] = [];
+    
+    // Collect all team scores (excluding neutral team ID 0)
+    for (const [teamId, vipKills] of gameState.vipKillsByTeamId.entries()) {
+        if (teamId !== 0) {
+            teamScores.push({ teamId, vipKills, rank: 0 });
+        }
+    }
+    
+    // Sort by VIP kills (descending)
+    teamScores.sort((a, b) => b.vipKills - a.vipKills);
+    
+    // Assign ranks
+    for (let i = 0; i < teamScores.length; i++) {
+        teamScores[i].rank = i + 1;
+    }
+    
+    gameState.sortedTeamScores = teamScores;
 }

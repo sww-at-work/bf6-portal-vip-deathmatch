@@ -6,23 +6,18 @@
  */
 
 import { CONFIG } from './config.ts';
-import { gameState } from './state.ts';
+import { gameState, type TeamScoreInfo } from './state.ts';
 
 // Constants
 const MAX_TEAMS_DISPLAYED = 3;
 const MIN_PROGRESS_BAR_WIDTH = 2;
-
-interface TeamScoreInfo {
-    teamId: number;
-    vipKills: number;
-    rank: number;
-}
 
 // Store UI widgets for updating
 const scoreUIWidgets: Map<string, mod.UIWidget> = new Map();
 
 /**
  * Get team color based on team ID
+ * Handles team ID 0 (neutral team) gracefully
  */
 function getTeamColor(teamId: number): mod.Vector {
     // Using BF team colors: Team 1 (blue), Team 2 (orange/red), etc.
@@ -34,6 +29,11 @@ function getTeamColor(teamId: number): mod.Vector {
         mod.CreateVector(0.8, 0.2, 1.0),   // Team 5: Purple
         mod.CreateVector(1.0, 0.6, 0.8),   // Team 6: Pink
     ];
+    
+    // Handle neutral team (ID 0) or invalid IDs
+    if (teamId <= 0) {
+        return mod.CreateVector(0.5, 0.5, 0.5); // Gray for neutral/invalid
+    }
     
     const index = (teamId - 1) % colors.length;
     return colors[index];
@@ -50,34 +50,13 @@ function getRankSuffix(rank: number): string {
 }
 
 /**
- * Get sorted team scores
- */
-function getSortedTeamScores(): TeamScoreInfo[] {
-    const teamScores: TeamScoreInfo[] = [];
-    
-    // Collect all team scores
-    for (const [teamId, vipKills] of gameState.vipKillsByTeamId.entries()) {
-        teamScores.push({ teamId, vipKills, rank: 0 });
-    }
-    
-    // Sort by VIP kills (descending)
-    teamScores.sort((a, b) => b.vipKills - a.vipKills);
-    
-    // Assign ranks
-    for (let i = 0; i < teamScores.length; i++) {
-        teamScores[i].rank = i + 1;
-    }
-    
-    return teamScores;
-}
-
-/**
  * Get the teams to display in the score UI for a specific player
+ * Uses cached sorted team scores for better performance
  * - Shows top 3 teams
  * - Always includes the player's team if not in top 3
  */
 function getTeamsToDisplay(player: mod.Player): TeamScoreInfo[] {
-    const allScores = getSortedTeamScores();
+    const allScores = gameState.sortedTeamScores;
     const playerTeamId = mod.GetObjId(mod.GetTeam(player));
     
     // Get top teams

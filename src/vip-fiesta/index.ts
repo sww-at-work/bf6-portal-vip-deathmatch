@@ -5,7 +5,7 @@ import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
 import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer } from './score-ui.ts';
-import { syncGameStateFromPlayers } from './state.ts';
+import { syncGameStateFromPlayers, updateSortedTeamScores } from './state.ts';
 import { gameState } from './state.ts';
 
 export class VIPFiesta {
@@ -13,6 +13,7 @@ export class VIPFiesta {
     initialize(): void {
         // Sync initial roster and teams at game start
         syncGameStateFromPlayers();
+        updateSortedTeamScores();
         initializeScoreboard();
         initializeScoreUI();
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
@@ -282,6 +283,7 @@ export class VIPFiesta {
     }
 
     private updateScoreboardValues(): void {
+        updateSortedTeamScores();
         updateScoreboard();
         updateScoreUI();
     }
