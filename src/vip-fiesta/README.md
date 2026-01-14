@@ -24,7 +24,7 @@ The team with the most VIP kills at the end of the match wins.
 
 - A UI element showing the current VIP kills per team should be present
 - This UI element should update in real-time as VIP kills occur
-- the UI should be positioned at the bottom left of the screen
+- the UI should be positioned at the top left of the screen (to avoid minimap overlap)
 - each team should have a distinct color for easy identification
 - the score of a team is represented by a progress bar filling up with the number of VIP kills
 - the progress bar should have a maximum length representing the target VIP kills to win

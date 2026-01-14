@@ -1,4 +1,4 @@
-import { getPlayersInTeam } from '../modlib/index.ts';
+import { getPlayersInTeam } from './utilities.ts';
 import { CONFIG } from './config.ts';
 import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';

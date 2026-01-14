@@ -29,12 +29,12 @@ function getTeamColor(teamId: number): mod.Vector {
         mod.CreateVector(0.8, 0.2, 1.0),   // Team 5: Purple
         mod.CreateVector(1.0, 0.6, 0.8),   // Team 6: Pink
     ];
-    
+
     // Handle neutral team (ID 0) or invalid IDs
     if (teamId <= 0) {
         return mod.CreateVector(0.5, 0.5, 0.5); // Gray for neutral/invalid
     }
-    
+
     const index = (teamId - 1) % colors.length;
     return colors[index];
 }
@@ -42,12 +42,7 @@ function getTeamColor(teamId: number): mod.Vector {
 /**
  * Get rank suffix (1st, 2nd, 3rd, 4th, etc.)
  */
-function getRankSuffix(rank: number): string {
-    if (rank === 1) return '1st';
-    if (rank === 2) return '2nd';
-    if (rank === 3) return '3rd';
-    return rank + 'th';
-}
+// Rank suffixes are handled via string keys in label composition.
 
 /**
  * Get the teams to display in the score UI for a specific player
@@ -58,23 +53,23 @@ function getRankSuffix(rank: number): string {
 function getTeamsToDisplay(player: mod.Player): TeamScoreInfo[] {
     const allScores = gameState.sortedTeamScores;
     const playerTeamId = mod.GetObjId(mod.GetTeam(player));
-    
+
     // Get top teams
     const topTeams = allScores.slice(0, MAX_TEAMS_DISPLAYED);
-    
+
     // Check if player's team is in top teams
     const playerTeamInTop = topTeams.some(t => t.teamId === playerTeamId);
-    
+
     if (playerTeamInTop || allScores.length <= MAX_TEAMS_DISPLAYED) {
         return topTeams;
     }
-    
+
     // Player's team is not in top teams, show top 2 and player's team
     const playerTeamInfo = allScores.find(t => t.teamId === playerTeamId);
     if (playerTeamInfo) {
         return [topTeams[0], topTeams[1], playerTeamInfo];
     }
-    
+
     return topTeams;
 }
 
@@ -84,13 +79,13 @@ function getTeamsToDisplay(player: mod.Player): TeamScoreInfo[] {
 function createScoreUIForPlayer(player: mod.Player): void {
     const playerId = mod.GetObjId(player);
     const widgetPrefix = `scoreUI_${playerId}`;
-    
-    // Main container at bottom left
-    const mainContainer = mod.AddUIContainer(
+
+    // Main container at top left (avoid minimap overlap)
+    mod.AddUIContainer(
         `${widgetPrefix}_main`,
-        mod.CreateVector(20, -20, 0),
+        mod.CreateVector(20, 20, 0),
         mod.CreateVector(400, 250, 0),
-        mod.UIAnchor.BottomLeft,
+        mod.UIAnchor.TopLeft,
         mod.GetUIRoot(),
         true,
         0,
@@ -99,11 +94,14 @@ function createScoreUIForPlayer(player: mod.Player): void {
         mod.UIBgFill.None,
         player
     );
-    
+    const mainContainer = mod.FindUIWidgetWithName(`${widgetPrefix}_main`) as mod.UIWidget;
+    if (!mainContainer) {
+        return;
+    }
     scoreUIWidgets.set(`${widgetPrefix}_main`, mainContainer);
-    
+
     // Target header: "TARGET: 10 VIP KILLS"
-    const headerWidget = mod.AddUIText(
+    mod.AddUIText(
         `${widgetPrefix}_header`,
         mod.CreateVector(0, 0, 0),
         mod.CreateVector(400, 30, 0),
@@ -121,9 +119,11 @@ function createScoreUIForPlayer(player: mod.Player): void {
         mod.UIAnchor.Center,
         player
     );
-    
-    scoreUIWidgets.set(`${widgetPrefix}_header`, headerWidget);
-    
+    const headerWidget = mod.FindUIWidgetWithName(`${widgetPrefix}_header`) as mod.UIWidget;
+    if (headerWidget) {
+        scoreUIWidgets.set(`${widgetPrefix}_header`, headerWidget);
+    }
+
     // Update the score display
     updateScoreUIForPlayer(player);
 }
@@ -135,7 +135,7 @@ function updateScoreUIForPlayer(player: mod.Player): void {
     const playerId = mod.GetObjId(player);
     const playerTeamId = mod.GetObjId(mod.GetTeam(player));
     const widgetPrefix = `scoreUI_${playerId}`;
-    
+
     // Clean up existing team entries
     for (let i = 0; i < MAX_TEAMS_DISPLAYED; i++) {
         const teamEntryKey = `${widgetPrefix}_team_${i}`;
@@ -150,22 +150,22 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             scoreUIWidgets.delete(teamEntryKey);
         }
     }
-    
+
     const mainContainer = scoreUIWidgets.get(`${widgetPrefix}_main`);
     if (!mainContainer) return;
-    
+
     const teamsToDisplay = getTeamsToDisplay(player);
     const yOffset = 40; // Start below the header
     const entryHeight = 60;
     const entrySpacing = 10;
-    
+
     for (let i = 0; i < teamsToDisplay.length; i++) {
         const teamInfo = teamsToDisplay[i];
         const isPlayerTeam = teamInfo.teamId === playerTeamId;
         const yPos = yOffset + i * (entryHeight + entrySpacing);
-        
+
         // Team entry container
-        const teamContainer = mod.AddUIContainer(
+        mod.AddUIContainer(
             `${widgetPrefix}_team_${i}`,
             mod.CreateVector(0, yPos, 0),
             mod.CreateVector(400, entryHeight, 0),
@@ -178,14 +178,25 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             mod.UIBgFill.Solid,
             player
         );
-        
+        const teamContainer = mod.FindUIWidgetWithName(`${widgetPrefix}_team_${i}`) as mod.UIWidget;
+        if (!teamContainer) {
+            continue;
+        }
         scoreUIWidgets.set(`${widgetPrefix}_team_${i}`, teamContainer);
-        
+
         // Rank and team label (left side)
-        const rankText = getRankSuffix(teamInfo.rank);
-        const teamName = getTeamName(teamInfo.teamId);
-        const labelText = isPlayerTeam ? `${rankText} ${teamName} (YOU)` : `${rankText} ${teamName}`;
-        
+        const rankString = teamInfo.rank === 1
+            ? '1st'
+            : teamInfo.rank === 2
+                ? '2nd'
+                : teamInfo.rank === 3
+                    ? '3rd'
+                    : `${teamInfo.rank}th`;
+        const teamName = `Team ${teamInfo.teamId}`;
+        const labelMessage = isPlayerTeam
+            ? mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou, rankString, teamName)
+            : mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel, rankString, teamName);
+
         mod.AddUIText(
             `${widgetPrefix}_team_${i}_label`,
             mod.CreateVector(8, 0, 0),
@@ -197,21 +208,21 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             mod.CreateVector(0, 0, 0),
             0,
             mod.UIBgFill.None,
-            mod.Message(labelText),
+            labelMessage,
             isPlayerTeam ? 16 : 14,
             mod.CreateVector(1, 1, 1),
             1,
             mod.UIAnchor.CenterLeft,
             player
         );
-        
+
         // Progress bar background
         const progressBarWidth = 180;
         const progressBarHeight = 20;
         const progressBarX = 160;
         const progressBarY = (entryHeight - progressBarHeight) / 2;
-        
-        const progressBg = mod.AddUIContainer(
+
+        mod.AddUIContainer(
             `${widgetPrefix}_team_${i}_progress_bg`,
             mod.CreateVector(progressBarX, progressBarY, 0),
             mod.CreateVector(progressBarWidth, progressBarHeight, 0),
@@ -224,13 +235,17 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             mod.UIBgFill.Solid,
             player
         );
-        
+        const progressBg = mod.FindUIWidgetWithName(`${widgetPrefix}_team_${i}_progress_bg`) as mod.UIWidget;
+        if (!progressBg) {
+            continue;
+        }
+
         // Progress bar fill
         const targetKills = Math.max(CONFIG.targetVipKills, 1); // Avoid division by zero
         const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
         const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
         const teamColor = getTeamColor(teamInfo.teamId);
-        
+
         mod.AddUIImage(
             `${widgetPrefix}_team_${i}_progress_fill`,
             mod.CreateVector(0, 0, 0),
@@ -247,7 +262,7 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             1,
             player
         );
-        
+
         // Score text (right side)
         mod.AddUIText(
             `${widgetPrefix}_team_${i}_score`,
@@ -260,7 +275,7 @@ function updateScoreUIForPlayer(player: mod.Player): void {
             mod.CreateVector(0, 0, 0),
             0,
             mod.UIBgFill.None,
-            mod.Message(String(teamInfo.vipKills)),
+            mod.Message(mod.stringkeys.vipFiesta.ui.plainNumber, teamInfo.vipKills),
             16,
             mod.CreateVector(1, 1, 1),
             1,
@@ -270,33 +285,16 @@ function updateScoreUIForPlayer(player: mod.Player): void {
     }
 }
 
-/**
- * Get team name from team ID
- */
-function getTeamName(teamId: number): string {
-    // Map team IDs to string keys
-    const teamKey = `team${teamId}`;
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const teamStringKey = (mod.stringkeys.vipFiesta.teams as any)[teamKey];
-        if (teamStringKey) {
-            return mod.FormatMessage(mod.Message(teamStringKey));
-        }
-    } catch {
-        // Fallback if team string key doesn't exist
-    }
-    return `Team ${teamId}`;
-}
 
 /**
  * Initialize score UI for all players
  */
 export function initializeScoreUI(): void {
     if (!CONFIG.ui.enableHud) return;
-    
+
     const allPlayers = mod.AllPlayers();
     const playerCount = mod.CountOf(allPlayers);
-    
+
     for (let i = 0; i < playerCount; i++) {
         const player = mod.ValueInArray(allPlayers, i) as mod.Player;
         createScoreUIForPlayer(player);
@@ -308,10 +306,10 @@ export function initializeScoreUI(): void {
  */
 export function updateScoreUI(): void {
     if (!CONFIG.ui.enableHud) return;
-    
+
     const allPlayers = mod.AllPlayers();
     const playerCount = mod.CountOf(allPlayers);
-    
+
     for (let i = 0; i < playerCount; i++) {
         const player = mod.ValueInArray(allPlayers, i) as mod.Player;
         updateScoreUIForPlayer(player);
@@ -331,7 +329,7 @@ export function createScoreUIForNewPlayer(player: mod.Player): void {
  */
 export function removeScoreUIForPlayer(playerId: number): void {
     const widgetPrefix = `scoreUI_${playerId}`;
-    
+
     // Clean up all widgets for this player
     for (const [key, widget] of scoreUIWidgets.entries()) {
         if (key.startsWith(widgetPrefix)) {
