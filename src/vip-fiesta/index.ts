@@ -1,18 +1,24 @@
-import { getPlayersInTeam } from '../modlib/index.ts';
+import { getPlayersInTeam } from './utilities.ts';
 import { CONFIG } from './config.ts';
 import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
-import { syncGameStateFromPlayers } from './state.ts';
+import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer } from './score-ui.ts';
+import { initializeHudUI, updateVipStatusWidget, removeHudUIForPlayer } from './hud-ui.ts';
+import { syncGameStateFromPlayers, updateSortedTeamScores } from './state.ts';
 import { gameState } from './state.ts';
+import { initializeAudio, playSoundForTeam, AudioEvent } from './audio.ts';
 
 export class VIPFiesta {
 
     initialize(): void {
         // Sync initial roster and teams at game start
         syncGameStateFromPlayers();
+        updateSortedTeamScores();
+        initializeAudio();
         initializeScoreboard();
+        initializeScoreUI();
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
@@ -46,13 +52,8 @@ export class VIPFiesta {
             this.assignVipForTeam(team);
         }
 
-        if (CONFIG.showIntroOnDeploy) {
-            const pid = mod.GetObjId(player);
-            if (!gameState.firstDeployByPlayerId.has(pid)) {
-                gameState.firstDeployByPlayerId.add(pid);
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting), player);
-            }
-        }
+        // Initialize HUD-UI for player
+        initializeHudUI(player);
 
         // Notify player if they are the VIP
         const vipId = gameState.teamVipById.get(teamId);
@@ -123,6 +124,8 @@ export class VIPFiesta {
         // If the victim was the VIP, treat as VIP death without awarding kills
         if (vipId !== undefined && vipId === victimId) {
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
+            // Play audio cue for friendly VIP death (suicide/accident)
+            playSoundForTeam(AudioEvent.FriendlyVipKilled, 1.0, victimTeam);
             gameState.teamVipById.delete(victimTeamId);
             (async () => {
                 await mod.Wait(CONFIG.vipReassignDelaySeconds);
@@ -171,6 +174,12 @@ export class VIPFiesta {
 
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
 
+            // Play audio cues for VIP kill
+            // Killer's team hears "PlayerKilledHVT" sound (they eliminated an enemy VIP)
+            playSoundForTeam(AudioEvent.EnemyVipKilled, 1.0, killerTeam);
+            // Victim's team hears "FriendlyHVTKilled" sound (their VIP was killed)
+            playSoundForTeam(AudioEvent.FriendlyVipKilled, 1.0, victimTeam);
+
             gameState.teamVipById.delete(victimTeamId);
 
             (async () => {
@@ -179,7 +188,7 @@ export class VIPFiesta {
             })();
 
             if (killerTeamKills >= CONFIG.targetVipKills) {
-                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+                mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, killerTeamId));
                 gameState.gameEnded = true;
                 mod.EndGameMode(killerTeam);
             }
@@ -194,6 +203,9 @@ export class VIPFiesta {
         if (!this.teamHasAssignedVip(teamId)) {
             this.assignVipForTeam(team);
         }
+
+        // Create score UI for the new player
+        createScoreUIForNewPlayer(player);
 
         // Update scoreboard when player joins
         this.updateScoreboardValues();
@@ -211,6 +223,12 @@ export class VIPFiesta {
 
         // Remove any icon bound to the leaving player
         removeVipIconForPlayerId(playerId);
+
+        // Remove score UI for the leaving player
+        removeScoreUIForPlayer(playerId);
+
+        // Remove HUD-UI for the leaving player
+        removeHudUIForPlayer(playerId);
 
         // Update scoreboard when player leaves
         this.updateScoreboardValues();
@@ -251,7 +269,7 @@ export class VIPFiesta {
             }
         }
         if (winningTeamId !== undefined && CONFIG.onTimeLimitAnnounceWinner) {
-            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins));
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, winningTeamId));
         }
     }
 
@@ -274,8 +292,15 @@ export class VIPFiesta {
     }
 
     private updateScoreboardValues(): void {
+        updateSortedTeamScores();
         updateScoreboard();
+        updateScoreUI();
+
+        // Update HUD VIP status for all active players
+        const allPlayers = mod.AllPlayers();
+        for (let i = 0; i < mod.CountOf(allPlayers); i++) {
+            const player = mod.ValueInArray(allPlayers, i) as mod.Player;
+            updateVipStatusWidget(player);
+        }
     }
-
-
 }
