@@ -1,4 +1,4 @@
-import { getPlayersInTeam } from './utilities.ts';
+import { getAlivePlayersInTeam } from './utilities.ts';
 import { CONFIG } from './config.ts';
 import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId, updateVipWorldIcons } from './spotting.ts';
 import { selectVipForTeam } from './selection.ts';
@@ -48,7 +48,21 @@ export class VIPFiesta {
         const team = mod.GetTeam(player);
         const teamId = mod.GetObjId(team);
 
-        if (!this.teamHasAssignedVip(teamId)) {
+        // Check if this team is awaiting VIP assignment (no alive players were available)
+        if (gameState.teamsAwaitingVipAssignment.has(teamId)) {
+            // Assign this deploying player as VIP
+            gameState.teamVipById.set(teamId, mod.GetObjId(player));
+            gameState.teamsAwaitingVipAssignment.delete(teamId);
+
+            // Notify the team with the new VIP's name
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.newVip, player), team);
+
+            // Notify the new VIP
+            mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.youAreVip), player);
+
+            // Update scoreboard when VIP changes
+            this.updateScoreboardValues();
+        } else if (!this.teamHasAssignedVip(teamId)) {
             this.assignVipForTeam(team);
         }
 
@@ -275,11 +289,17 @@ export class VIPFiesta {
 
     private assignVipForTeam(team: mod.Team): void {
         const teamId = mod.GetObjId(team);
-        const members = getPlayersInTeam(team);
-        if (members.length === 0) return;
+        const aliveMembers = getAlivePlayersInTeam(team);
 
-        const newVip = selectVipForTeam(members);
+        // If no alive players, mark team as awaiting VIP assignment
+        if (aliveMembers.length === 0) {
+            gameState.teamsAwaitingVipAssignment.add(teamId);
+            return;
+        }
+
+        const newVip = selectVipForTeam(aliveMembers);
         gameState.teamVipById.set(teamId, mod.GetObjId(newVip));
+        gameState.teamsAwaitingVipAssignment.delete(teamId);
 
         // Notify the team with the new VIP's name
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.newVip, newVip), team);

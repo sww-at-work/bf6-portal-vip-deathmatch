@@ -15,6 +15,7 @@ export interface GameState {
     lastGlobalSpotAt: number;
     gameEnded: boolean;
     sortedTeamScores: TeamScoreInfo[];
+    teamsAwaitingVipAssignment: Set<number>;
 }
 
 export const gameState: GameState = {
@@ -28,6 +29,7 @@ export const gameState: GameState = {
     lastGlobalSpotAt: 0,
     gameEnded: false,
     sortedTeamScores: [],
+    teamsAwaitingVipAssignment: new Set(),
 };
 
 /**
@@ -88,21 +90,21 @@ export function syncGameStateFromPlayers(): void {
  */
 export function updateSortedTeamScores(): void {
     const teamScores: TeamScoreInfo[] = [];
-    
+
     // Collect all team scores (excluding neutral team ID 0)
     for (const [teamId, vipKills] of gameState.vipKillsByTeamId.entries()) {
         if (teamId !== 0) {
             teamScores.push({ teamId, vipKills, rank: 0 });
         }
     }
-    
+
     // Sort by VIP kills (descending)
     teamScores.sort((a, b) => b.vipKills - a.vipKills);
-    
+
     // Assign ranks
     for (let i = 0; i < teamScores.length; i++) {
         teamScores[i].rank = i + 1;
     }
-    
+
     gameState.sortedTeamScores = teamScores;
 }
