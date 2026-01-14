@@ -8,6 +8,10 @@
 import { CONFIG } from './config.ts';
 import { gameState } from './state.ts';
 
+// Constants
+const MAX_TEAMS_DISPLAYED = 3;
+const MIN_PROGRESS_BAR_WIDTH = 2;
+
 interface TeamScoreInfo {
     teamId: number;
     vipKills: number;
@@ -76,17 +80,17 @@ function getTeamsToDisplay(player: mod.Player): TeamScoreInfo[] {
     const allScores = getSortedTeamScores();
     const playerTeamId = mod.GetObjId(mod.GetTeam(player));
     
-    // Get top 3 teams
-    const topTeams = allScores.slice(0, 3);
+    // Get top teams
+    const topTeams = allScores.slice(0, MAX_TEAMS_DISPLAYED);
     
-    // Check if player's team is in top 3
-    const playerTeamInTop3 = topTeams.some(t => t.teamId === playerTeamId);
+    // Check if player's team is in top teams
+    const playerTeamInTop = topTeams.some(t => t.teamId === playerTeamId);
     
-    if (playerTeamInTop3 || allScores.length <= 3) {
+    if (playerTeamInTop || allScores.length <= MAX_TEAMS_DISPLAYED) {
         return topTeams;
     }
     
-    // Player's team is not in top 3, show top 2 and player's team
+    // Player's team is not in top teams, show top 2 and player's team
     const playerTeamInfo = allScores.find(t => t.teamId === playerTeamId);
     if (playerTeamInfo) {
         return [topTeams[0], topTeams[1], playerTeamInfo];
@@ -154,7 +158,7 @@ function updateScoreUIForPlayer(player: mod.Player): void {
     const widgetPrefix = `scoreUI_${playerId}`;
     
     // Clean up existing team entries
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < MAX_TEAMS_DISPLAYED; i++) {
         const teamEntryKey = `${widgetPrefix}_team_${i}`;
         const existingWidget = scoreUIWidgets.get(teamEntryKey);
         if (existingWidget) {
@@ -243,8 +247,9 @@ function updateScoreUIForPlayer(player: mod.Player): void {
         );
         
         // Progress bar fill
-        const progress = Math.min(teamInfo.vipKills / CONFIG.targetVipKills, 1.0);
-        const fillWidth = Math.max(progressBarWidth * progress, 2);
+        const targetKills = Math.max(CONFIG.targetVipKills, 1); // Avoid division by zero
+        const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
+        const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
         const teamColor = getTeamColor(teamInfo.teamId);
         
         mod.AddUIImage(
