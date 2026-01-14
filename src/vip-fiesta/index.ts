@@ -123,6 +123,8 @@ export class VIPFiesta {
         // If the victim was the VIP, treat as VIP death without awarding kills
         if (vipId !== undefined && vipId === victimId) {
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
+            // Play audio cue for friendly VIP death (suicide/accident)
+            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_FriendlyHVTKilled_OneShot2D, 1.0, victimTeam);
             gameState.teamVipById.delete(victimTeamId);
             (async () => {
                 await mod.Wait(CONFIG.vipReassignDelaySeconds);
@@ -170,6 +172,12 @@ export class VIPFiesta {
             );
 
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.vipDied), victimTeam);
+
+            // Play audio cues for VIP kill
+            // Killer's team hears "PlayerKilledHVT" sound (they eliminated an enemy VIP)
+            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_PlayerKilledHVT_OneShot2D, 1.0, killerTeam);
+            // Victim's team hears "FriendlyHVTKilled" sound (their VIP was killed)
+            mod.PlaySound(mod.SFX.SFX_UI_Gauntlet_Vendetta_FriendlyHVTKilled_OneShot2D, 1.0, victimTeam);
 
             gameState.teamVipById.delete(victimTeamId);
 
