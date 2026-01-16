@@ -23,6 +23,9 @@ const TEAM_ENTRY_SPACING = 0;
 // Store UI widgets for updating
 const scoreUIWidgets: Map<string, mod.UIWidget> = new Map();
 
+// Store last displayed teams per player to detect changes
+const lastDisplayedTeams: Map<number, TeamScoreInfo[]> = new Map();
+
 /**
  * Get team color based on team ID
  * Handles team ID 0 (neutral team) gracefully
@@ -123,155 +126,253 @@ function updateScoreUIForPlayer(player: mod.Player): void {
     const playerTeamId = mod.GetObjId(mod.GetTeam(player));
     const widgetPrefix = "scoreUI_" + playerId;
 
-    // Clean up existing team entries
-    for (let i = 0; i < MAX_TEAMS_DISPLAYED; i++) {
-        const teamEntryKey = widgetPrefix + "_team_" + i;
-        const existingWidget = scoreUIWidgets.get(teamEntryKey);
-        if (existingWidget) {
-            try {
-                mod.DeleteUIWidget(existingWidget);
-            } catch (error) {
-                // Widget might already be deleted or invalid
-                console.log("Could not delete widget " + teamEntryKey + ":", error);
-            }
-            scoreUIWidgets.delete(teamEntryKey);
-        }
-    }
-
     const mainContainer = scoreUIWidgets.get(widgetPrefix + "_main");
     if (!mainContainer) return;
 
     const teamsToDisplay = getTeamsToDisplay(player);
-    // Start below the global header, using its height
-    const yOffset = 0; // relative to mainContainer position, there is a global header above
+    const lastTeams = lastDisplayedTeams.get(playerId) || [];
+
+    // Check if team list structure changed (different teams or order)
+    const teamsChanged = teamsToDisplay.length !== lastTeams.length ||
+        teamsToDisplay.some((t, i) => t.teamId !== lastTeams[i]?.teamId);
+
+    if (teamsChanged) {
+        // Recreate all team entries if the team list changed
+        for (let i = 0; i < MAX_TEAMS_DISPLAYED; i++) {
+            const teamEntryKey = widgetPrefix + "_team_" + i;
+            deleteTeamEntry(teamEntryKey);
+        }
+
+        // Create new team entries
+        for (let i = 0; i < teamsToDisplay.length; i++) {
+            createTeamEntry(player, playerId, playerTeamId, widgetPrefix, teamsToDisplay[i], i);
+        }
+
+        lastDisplayedTeams.set(playerId, teamsToDisplay);
+    } else {
+        // Update existing team entries
+        for (let i = 0; i < teamsToDisplay.length; i++) {
+            updateTeamEntry(player, playerId, playerTeamId, widgetPrefix, teamsToDisplay[i], i);
+        }
+    }
+}
+
+/**
+ * Delete a team entry and all its child widgets
+ */
+function deleteTeamEntry(teamEntryKey: string): void {
+    const existingWidget = scoreUIWidgets.get(teamEntryKey);
+    if (existingWidget) {
+        try {
+            mod.DeleteUIWidget(existingWidget);
+        } catch (error) {
+            console.log("Could not delete widget " + teamEntryKey + ":", error);
+        }
+        // Remove all child widgets from map
+        for (const key of scoreUIWidgets.keys()) {
+            if (key.startsWith(teamEntryKey)) {
+                scoreUIWidgets.delete(key);
+            }
+        }
+    }
+}
+
+/**
+ * Create a new team entry with all its widgets
+ */
+function createTeamEntry(
+    player: mod.Player,
+    playerId: number,
+    playerTeamId: number,
+    widgetPrefix: string,
+    teamInfo: TeamScoreInfo,
+    index: number
+): void {
+    const mainContainer = scoreUIWidgets.get(widgetPrefix + "_main");
+    if (!mainContainer) return;
+
+    const isPlayerTeam = teamInfo.teamId === playerTeamId;
+    const yOffset = 0;
     const entryHeight = TEAM_ENTRY_HEIGHT;
     const entrySpacing = TEAM_ENTRY_SPACING;
+    const yPos = yOffset + index * (entryHeight + entrySpacing);
 
-    for (let i = 0; i < teamsToDisplay.length; i++) {
-        const teamInfo = teamsToDisplay[i];
-        const isPlayerTeam = teamInfo.teamId === playerTeamId;
-        const yPos = yOffset + i * (entryHeight + entrySpacing);
+    // Team entry container
+    mod.AddUIContainer(
+        widgetPrefix + "_team_" + index,
+        mod.CreateVector(0, yPos, 0),
+        mod.CreateVector(SCORE_UI_WIDTH, entryHeight, 0),
+        mod.UIAnchor.TopLeft,
+        mainContainer,
+        true,
+        4,
+        isPlayerTeam ? mod.CreateVector(0.3, 0.3, 0.3) : mod.CreateVector(0.1, 0.1, 0.1),
+        isPlayerTeam ? 0.9 : 0.7,
+        mod.UIBgFill.Solid,
+        player
+    );
+    const teamContainer = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + index) as mod.UIWidget;
+    if (!teamContainer) return;
+    scoreUIWidgets.set(widgetPrefix + "_team_" + index, teamContainer);
 
-        // Team entry container
-        mod.AddUIContainer(
-            widgetPrefix + "_team_" + i,
-            mod.CreateVector(0, yPos, 0),
-            mod.CreateVector(SCORE_UI_WIDTH, entryHeight, 0),
-            mod.UIAnchor.TopLeft,
-            mainContainer,
-            true,
-            4,
-            isPlayerTeam ? mod.CreateVector(0.3, 0.3, 0.3) : mod.CreateVector(0.1, 0.1, 0.1),
-            isPlayerTeam ? 0.9 : 0.7,
-            mod.UIBgFill.Solid,
-            player
-        );
-        const teamContainer = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + i) as mod.UIWidget;
-        if (!teamContainer) {
-            continue;
-        }
-        scoreUIWidgets.set(widgetPrefix + "_team_" + i, teamContainer);
+    // Rank and team label (left side)
+    const labelMessage = getTeamLabelMessage(teamInfo, isPlayerTeam);
 
-        // Rank and team label (left side)
-        const teamName = teamInfo.teamId;
-        let labelMessage: mod.Message;
-        if (isPlayerTeam) {
-            if (teamInfo.rank === 1) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou1st, teamName);
-            else if (teamInfo.rank === 2) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou2nd, teamName);
-            else if (teamInfo.rank === 3) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou3rd, teamName);
-            else labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYouNth, teamInfo.rank, teamName);
-        } else {
-            if (teamInfo.rank === 1) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel1st, teamName);
-            else if (teamInfo.rank === 2) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel2nd, teamName);
-            else if (teamInfo.rank === 3) labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel3rd, teamName);
-            else labelMessage = mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelNth, teamInfo.rank, teamName);
-        }
+    mod.AddUIText(
+        widgetPrefix + "_team_" + index + "_label",
+        mod.CreateVector(8, 0, 0),
+        mod.CreateVector(150, entryHeight, 0),
+        mod.UIAnchor.TopLeft,
+        teamContainer,
+        true,
+        0,
+        mod.CreateVector(0, 0, 0),
+        0,
+        mod.UIBgFill.None,
+        labelMessage,
+        isPlayerTeam ? 16 : 14,
+        mod.CreateVector(1, 1, 1),
+        1,
+        mod.UIAnchor.CenterLeft,
+        player
+    );
 
-        mod.AddUIText(
-            widgetPrefix + "_team_" + i + "_label",
-            mod.CreateVector(8, 0, 0),
-            mod.CreateVector(150, entryHeight, 0),
-            mod.UIAnchor.TopLeft,
+    // Progress bar background
+    const progressBarWidth = 180;
+    const progressBarHeight = 20;
+    const progressBarX = 160;
+    const progressBarY = (entryHeight - progressBarHeight) / 2;
+
+    mod.AddUIContainer(
+        widgetPrefix + "_team_" + index + "_progress_bg",
+        mod.CreateVector(progressBarX, progressBarY, 0),
+        mod.CreateVector(progressBarWidth, progressBarHeight, 0),
+        mod.UIAnchor.TopLeft,
+        teamContainer,
+        true,
+        0,
+        mod.CreateVector(0.1, 0.1, 0.1),
+        0.8,
+        mod.UIBgFill.Solid,
+        player
+    );
+    const progressBg = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + index + "_progress_bg") as mod.UIWidget;
+    if (!progressBg) return;
+
+    // Progress bar fill
+    const targetKills = Math.max(CONFIG.targetVipKills, 1);
+    const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
+    const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
+    const teamColor = getTeamColor(teamInfo.teamId);
+
+    mod.AddUIImage(
+        widgetPrefix + "_team_" + index + "_progress_fill",
+        mod.CreateVector(0, 0, 0),
+        mod.CreateVector(fillWidth, progressBarHeight, 0),
+        mod.UIAnchor.TopLeft,
+        progressBg,
+        true,
+        0,
+        teamColor,
+        0.9,
+        mod.UIBgFill.Solid,
+        mod.UIImageType.None,
+        teamColor,
+        1,
+        player
+    );
+    const progressFill = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + index + "_progress_fill") as mod.UIWidget;
+    if (progressFill) {
+        scoreUIWidgets.set(widgetPrefix + "_team_" + index + "_progress_fill", progressFill);
+    }
+
+    // Score text (right side)
+    mod.AddUIText(
+        widgetPrefix + "_team_" + index + "_score",
+        mod.CreateVector(0, 0, 0),
+        mod.CreateVector(50, entryHeight, 0),
+        mod.UIAnchor.TopRight,
+        teamContainer,
+        true,
+        0,
+        mod.CreateVector(0, 0, 0),
+        0,
+        mod.UIBgFill.None,
+        mod.Message(mod.stringkeys.vipFiesta.ui.plainNumber, teamInfo.vipKills),
+        16,
+        mod.CreateVector(1, 1, 1),
+        1,
+        mod.UIAnchor.CenterRight,
+        player
+    );
+}
+
+/**
+ * Update an existing team entry using setters
+ */
+function updateTeamEntry(
+    player: mod.Player,
+    playerId: number,
+    playerTeamId: number,
+    widgetPrefix: string,
+    teamInfo: TeamScoreInfo,
+    index: number
+): void {
+    const isPlayerTeam = teamInfo.teamId === playerTeamId;
+
+    // Update team container background
+    const teamContainer = scoreUIWidgets.get(widgetPrefix + "_team_" + index);
+    if (teamContainer) {
+        mod.SetUIWidgetBgColor(
             teamContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            0,
-            mod.UIBgFill.None,
-            labelMessage,
-            isPlayerTeam ? 16 : 14,
-            mod.CreateVector(1, 1, 1),
-            1,
-            mod.UIAnchor.CenterLeft,
-            player
+            isPlayerTeam ? mod.CreateVector(0.3, 0.3, 0.3) : mod.CreateVector(0.1, 0.1, 0.1)
         );
+        mod.SetUIWidgetBgAlpha(teamContainer, isPlayerTeam ? 0.9 : 0.7);
+    }
 
-        // Progress bar background
-        const progressBarWidth = 180;
-        const progressBarHeight = 20;
-        const progressBarX = 160;
-        const progressBarY = (entryHeight - progressBarHeight) / 2;
+    // Update label text
+    const labelWidget = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + index + "_label") as mod.UIWidget;
+    if (labelWidget) {
+        const labelMessage = getTeamLabelMessage(teamInfo, isPlayerTeam);
+        mod.SetUITextLabel(labelWidget, labelMessage);
+        mod.SetUITextSize(labelWidget, isPlayerTeam ? 16 : 14);
+    }
 
-        mod.AddUIContainer(
-            widgetPrefix + "_team_" + i + "_progress_bg",
-            mod.CreateVector(progressBarX, progressBarY, 0),
-            mod.CreateVector(progressBarWidth, progressBarHeight, 0),
-            mod.UIAnchor.TopLeft,
-            teamContainer,
-            true,
-            0,
-            mod.CreateVector(0.1, 0.1, 0.1),
-            0.8,
-            mod.UIBgFill.Solid,
-            player
-        );
-        const progressBg = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + i + "_progress_bg") as mod.UIWidget;
-        if (!progressBg) {
-            continue;
-        }
+    // Update progress bar fill
+    const progressBarWidth = 180;
+    const targetKills = Math.max(CONFIG.targetVipKills, 1);
+    const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
+    const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
+    const teamColor = getTeamColor(teamInfo.teamId);
 
-        // Progress bar fill
-        const targetKills = Math.max(CONFIG.targetVipKills, 1); // Avoid division by zero
-        const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
-        const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
-        const teamColor = getTeamColor(teamInfo.teamId);
+    const progressFill = scoreUIWidgets.get(widgetPrefix + "_team_" + index + "_progress_fill");
+    if (progressFill) {
+        mod.SetUIWidgetSize(progressFill, mod.CreateVector(fillWidth, 20, 0));
+        mod.SetUIImageColor(progressFill, teamColor);
+    }
 
-        mod.AddUIImage(
-            widgetPrefix + "_team_" + i + "_progress_fill",
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(fillWidth, progressBarHeight, 0),
-            mod.UIAnchor.TopLeft,
-            progressBg,
-            true,
-            0,
-            teamColor,
-            0.9,
-            mod.UIBgFill.Solid,
-            mod.UIImageType.None,
-            teamColor,
-            1,
-            player
-        );
+    // Update score text
+    const scoreWidget = mod.FindUIWidgetWithName(widgetPrefix + "_team_" + index + "_score") as mod.UIWidget;
+    if (scoreWidget) {
+        mod.SetUITextLabel(scoreWidget, mod.Message(mod.stringkeys.vipFiesta.ui.plainNumber, teamInfo.vipKills));
+    }
+}
 
-        // Score text (right side)
-        mod.AddUIText(
-            widgetPrefix + "_team_" + i + "_score",
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(50, entryHeight, 0),
-            mod.UIAnchor.TopRight,
-            teamContainer,
-            true,
-            0,
-            mod.CreateVector(0, 0, 0),
-            0,
-            mod.UIBgFill.None,
-            mod.Message(mod.stringkeys.vipFiesta.ui.plainNumber, teamInfo.vipKills),
-            16,
-            mod.CreateVector(1, 1, 1),
-            1,
-            mod.UIAnchor.CenterRight,
-            player
-        );
+/**
+ * Get the appropriate label message for a team entry
+ */
+function getTeamLabelMessage(teamInfo: TeamScoreInfo, isPlayerTeam: boolean): mod.Message {
+    const teamName = teamInfo.teamId;
+    if (isPlayerTeam) {
+        if (teamInfo.rank === 1) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou1st, teamName);
+        else if (teamInfo.rank === 2) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou2nd, teamName);
+        else if (teamInfo.rank === 3) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYou3rd, teamName);
+        else return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelYouNth, teamInfo.rank, teamName);
+    } else {
+        if (teamInfo.rank === 1) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel1st, teamName);
+        else if (teamInfo.rank === 2) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel2nd, teamName);
+        else if (teamInfo.rank === 3) return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabel3rd, teamName);
+        else return mod.Message(mod.stringkeys.vipFiesta.ui.teamLabelNth, teamInfo.rank, teamName);
     }
 }
 

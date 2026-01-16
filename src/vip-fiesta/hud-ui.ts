@@ -78,16 +78,6 @@ export function updateVipStatusWidget(player: mod.Player): void {
     const teamVipId = gameState.teamVipById.get(playerTeamId);
     const isVip = teamVipId !== undefined && teamVipId === playerId;
 
-    // Delete old label if exists
-    const oldLabel = mod.FindUIWidgetWithName(labelWidgetName) as mod.UIWidget;
-    if (oldLabel) {
-        try {
-            mod.DeleteUIWidget(oldLabel);
-        } catch (error) {
-            console.log("Could not delete HUD VIP label widget: " + labelWidgetName, error);
-        }
-    }
-
     let message: mod.Message;
     let bgColor: mod.Vector;
     let textColor: mod.Vector;
@@ -126,29 +116,39 @@ export function updateVipStatusWidget(player: mod.Player): void {
         textColor = mod.CreateVector(1.0, 1.0, 1.0); // White
     }
 
-    // Create new label
-    mod.AddUIText(
-        labelWidgetName,
-        mod.CreateVector(0, 0, 0),
-        mod.CreateVector(HUD_VIP_WIDTH, HUD_VIP_HEIGHT, 0),
-        mod.UIAnchor.TopLeft,
-        container,
-        true,
-        2,
-        bgColor,
-        0.8,
-        mod.UIBgFill.Solid,
-        message,
-        fontSize,
-        textColor,
-        1.0,
-        mod.UIAnchor.Center,
-        player
-    );
+    // Get existing label or create new one
+    let label = hudVipWidgets.get(labelWidgetName);
+    if (!label) {
+        // Create new label
+        mod.AddUIText(
+            labelWidgetName,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(HUD_VIP_WIDTH, HUD_VIP_HEIGHT, 0),
+            mod.UIAnchor.TopLeft,
+            container,
+            true,
+            2,
+            bgColor,
+            0.8,
+            mod.UIBgFill.Solid,
+            message,
+            fontSize,
+            textColor,
+            1.0,
+            mod.UIAnchor.Center,
+            player
+        );
 
-    const label = mod.FindUIWidgetWithName(labelWidgetName) as mod.UIWidget;
-    if (label) {
-        hudVipWidgets.set(labelWidgetName, label);
+        label = mod.FindUIWidgetWithName(labelWidgetName) as mod.UIWidget;
+        if (label) {
+            hudVipWidgets.set(labelWidgetName, label);
+        }
+    } else {
+        // Update existing label using setters
+        mod.SetUITextLabel(label, message);
+        mod.SetUITextSize(label, fontSize);
+        mod.SetUITextColor(label, textColor);
+        mod.SetUIWidgetBgColor(label, bgColor);
     }
 }
 

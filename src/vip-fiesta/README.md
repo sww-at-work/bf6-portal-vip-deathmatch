@@ -123,6 +123,9 @@ The following file structure is an example, but not mandatory, for organizing th
 
 ### Open Questions
 
-- How to handle team balancing if players join/leave mid-game?
-- How is the team assignment behavior when players join mid-game via friends or matchmaking?
-- how are squads organized within teams (e.g. is there more than one squad per team possible)?
+- **Q:** How to handle team balancing if players join/leave mid-game?
+- **Q:** How is the team assignment behavior when players join mid-game via friends or matchmaking?  
+  **A:**
+  - Players joining mid-game through friend list (either by joining game or party) are assigned to the team their friend is on.
+  - Players joining mid-game through matchmaking are assigned to the team with the fewest players.
+- **Q:** How are squads organized within teams (e.g. is there more than one squad per team possible)?
