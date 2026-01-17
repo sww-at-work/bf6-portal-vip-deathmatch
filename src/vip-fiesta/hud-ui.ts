@@ -130,7 +130,7 @@ export function updateVipStatusWidget(player: mod.Player): void {
             2,
             bgColor,
             0.8,
-            mod.UIBgFill.Solid,
+            mod.UIBgFill.Blur,
             message,
             fontSize,
             textColor,

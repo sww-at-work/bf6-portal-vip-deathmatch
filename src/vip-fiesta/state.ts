@@ -13,6 +13,7 @@ export interface GameState {
     firstDeployByPlayerId: Set<number>;
     vipSpottingShownFor: Map<number, { youAreVip: boolean }>;
     lastGlobalSpotAt: number;
+    lastTimeUpdateAt: number;
     gameEnded: boolean;
     sortedTeamScores: TeamScoreInfo[];
     teamsAwaitingVipAssignment: Set<number>;
@@ -27,6 +28,7 @@ export const gameState: GameState = {
     firstDeployByPlayerId: new Set(),
     vipSpottingShownFor: new Map(),
     lastGlobalSpotAt: 0,
+    lastTimeUpdateAt: 0,
     gameEnded: false,
     sortedTeamScores: [],
     teamsAwaitingVipAssignment: new Set(),

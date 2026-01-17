@@ -2,6 +2,8 @@
   "vipFiesta": {
     "ui": {
       "targetHeader": "Target VIP Kills: {}",
+      "roundOver": "Round Over",
+      "roundOverWinner": "Round Over — Team {} Wins",
       "teamLabel1st": "1st - Team {}",
       "teamLabel2nd": "2nd - Team {}",
       "teamLabel3rd": "3rd - Team {}",
@@ -32,7 +34,11 @@
     },
     "hud": {
       "yourVip": "Your VIP: {}",
-      "youAreVipShort": "YOU are the VIP"
+      "youAreVipShort": "YOU are the VIP",
+      "timeRemainingMMSS": "Time Remaining: {}:{}",
+      "timeRemainingMM0SS": "Time Remaining: {}:0{}",
+      "timeRemaining0MMSS": "Time Remaining: 0{}:{}",
+      "timeRemaining0MM0SS": "Time Remaining: 0{}:0{}"
     }
   }
 }

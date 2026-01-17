@@ -4,7 +4,7 @@ import { spotVipTargetsGlobal, removeVipIconForPlayer, removeVipIconForPlayerId,
 import { selectVipForTeam } from './selection.ts';
 // Death processing is handled within VIPFiesta to avoid passing functions/state around
 import { initializeScoreboard, updateScoreboard } from './scoreboard.ts';
-import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer } from './score-ui.ts';
+import { initializeScoreUI, updateScoreUI, createScoreUIForNewPlayer, removeScoreUIForPlayer, updateTimeWidget, showEndOfRoundOverlay } from './score-ui.ts';
 import { initializeHudUI, updateVipStatusWidget, removeHudUIForPlayer } from './hud-ui.ts';
 import { syncGameStateFromPlayers, updateSortedTeamScores } from './state.ts';
 import { gameState } from './state.ts';
@@ -42,6 +42,12 @@ export class VIPFiesta {
         }
         // Update WorldIcon positions smoothly every tick
         updateVipWorldIcons();
+
+        // Update global time widget every second
+        if (now - gameState.lastTimeUpdateAt >= 1000) {
+            updateTimeWidget();
+            gameState.lastTimeUpdateAt = now;
+        }
     }
 
     onPlayerDeployed(player: mod.Player): void {
@@ -204,7 +210,7 @@ export class VIPFiesta {
             if (killerTeamKills >= CONFIG.targetVipKills) {
                 mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, killerTeamId));
                 gameState.gameEnded = true;
-                mod.EndGameMode(killerTeam);
+                this.endRound(killerTeamId);
             }
         }
     }
@@ -273,7 +279,6 @@ export class VIPFiesta {
     }
 
     onTimeLimitReached(): void {
-        // Announce winner by VIP kills if any
         let winningTeamId: number | undefined;
         let topKills = -1;
         for (const [teamId, kills] of gameState.vipKillsByTeamId.entries()) {
@@ -285,6 +290,44 @@ export class VIPFiesta {
         if (winningTeamId !== undefined && CONFIG.onTimeLimitAnnounceWinner) {
             mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.teamWins, winningTeamId));
         }
+        this.endRound(winningTeamId);
+    }
+
+    private endRound(winningTeamId: number | undefined): void {
+        if (!gameState.gameEnded) {
+            gameState.gameEnded = true;
+        }
+
+        // Show end-of-round overlay with winner in header, if available
+        showEndOfRoundOverlay(winningTeamId);
+
+        (async () => {
+            await mod.Wait(5);
+            let winnerTeam: mod.Team | undefined;
+            if (winningTeamId !== undefined) {
+                const players = mod.AllPlayers();
+                for (let i = 0; i < mod.CountOf(players); i++) {
+                    const p = mod.ValueInArray(players, i) as mod.Player;
+                    const t = mod.GetTeam(p);
+                    if (mod.GetObjId(t) === winningTeamId) {
+                        winnerTeam = t;
+                        break;
+                    }
+                }
+            }
+            try {
+                if (winnerTeam) {
+                    mod.EndGameMode(winnerTeam);
+                } else {
+                    // Fallback: use any player's team
+                    const players = mod.AllPlayers();
+                    if (mod.CountOf(players) > 0) {
+                        const p = mod.ValueInArray(players, 0) as mod.Player;
+                        mod.EndGameMode(mod.GetTeam(p));
+                    }
+                }
+            } catch { }
+        })();
     }
 
     private assignVipForTeam(team: mod.Team): void {

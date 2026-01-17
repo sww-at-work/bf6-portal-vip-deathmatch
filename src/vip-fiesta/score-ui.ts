@@ -17,6 +17,8 @@ const SCORE_UI_WIDTH = 400;
 const SCORE_UI_HEIGHT = 250;
 const HEADER_HEIGHT = 30;
 const HEADER_FONT_SIZE = 20;
+const TIME_WIDGET_HEIGHT = 25;
+const TIME_WIDGET_SPACING = 0;
 const TEAM_ENTRY_HEIGHT = 60;
 const TEAM_ENTRY_SPACING = 0;
 
@@ -25,6 +27,24 @@ const scoreUIWidgets: Map<string, mod.UIWidget> = new Map();
 
 // Store last displayed teams per player to detect changes
 const lastDisplayedTeams: Map<number, TeamScoreInfo[]> = new Map();
+
+/**
+ * Create a time remaining message using numeric placeholders,
+ * selecting the appropriate string key for zero-padded cases.
+ */
+function getTimeRemainingMessage(minutes: number, seconds: number): mod.Message {
+    const minUnder10 = minutes < 10;
+    const secUnder10 = seconds < 10;
+    if (!minUnder10 && !secUnder10) {
+        return mod.Message(mod.stringkeys.vipFiesta.hud.timeRemainingMMSS, minutes, seconds);
+    } else if (!minUnder10 && secUnder10) {
+        return mod.Message(mod.stringkeys.vipFiesta.hud.timeRemainingMM0SS, minutes, seconds);
+    } else if (minUnder10 && !secUnder10) {
+        return mod.Message(mod.stringkeys.vipFiesta.hud.timeRemaining0MMSS, minutes, seconds);
+    } else {
+        return mod.Message(mod.stringkeys.vipFiesta.hud.timeRemaining0MM0SS, minutes, seconds);
+    }
+}
 
 /**
  * Get team color based on team ID
@@ -92,9 +112,11 @@ function createScoreUIForPlayer(player: mod.Player): void {
     const widgetPrefix = "scoreUI_" + playerId;
 
     // Main container at top left (avoid minimap overlap)
+    // Position below header and time widget
+    const containerY = SCORE_UI_Y + HEADER_HEIGHT + TIME_WIDGET_SPACING + TIME_WIDGET_HEIGHT;
     mod.AddUIContainer(
         widgetPrefix + "_main",
-        mod.CreateVector(SCORE_UI_X, HEADER_HEIGHT + SCORE_UI_Y, 0),
+        mod.CreateVector(SCORE_UI_X, containerY, 0),
         mod.CreateVector(SCORE_UI_WIDTH, SCORE_UI_HEIGHT, 0),
         mod.UIAnchor.TopLeft,
         mod.GetUIRoot(),
@@ -384,6 +406,7 @@ function ensureGlobalTargetHeader(): void {
     const existing = mod.FindUIWidgetWithName(globalHeaderName) as mod.UIWidget;
     if (existing) {
         scoreUIWidgets.set(globalHeaderName, existing);
+        ensureGlobalTimeWidget();
         return;
     }
     // Create a global text widget at top-left
@@ -408,6 +431,66 @@ function ensureGlobalTargetHeader(): void {
     if (header) {
         scoreUIWidgets.set(globalHeaderName, header);
     }
+
+    // Create global time widget below the header
+    ensureGlobalTimeWidget();
+}
+
+/**
+ * Create a single global time widget for all players
+ */
+function ensureGlobalTimeWidget(): void {
+    const globalTimeName = "scoreUI_global_time";
+    const existing = mod.FindUIWidgetWithName(globalTimeName) as mod.UIWidget;
+    if (existing) {
+        scoreUIWidgets.set(globalTimeName, existing);
+        return;
+    }
+
+    // Create time widget below the header
+    const remainingTime = mod.GetMatchTimeRemaining();
+    const minutes = Math.floor(remainingTime / 60);
+    const seconds = Math.floor(remainingTime % 60);
+    const timeMsg = getTimeRemainingMessage(minutes, seconds);
+    mod.AddUIText(
+        globalTimeName,
+        mod.CreateVector(SCORE_UI_X, SCORE_UI_Y + HEADER_HEIGHT + TIME_WIDGET_SPACING, 0),
+        mod.CreateVector(SCORE_UI_WIDTH, TIME_WIDGET_HEIGHT, 0),
+        mod.UIAnchor.TopLeft,
+        mod.GetUIRoot(),
+        true,
+        0,
+        mod.CreateVector(0.1, 0.1, 0.1),
+        0.7,
+        mod.UIBgFill.Solid,
+        timeMsg,
+        14,
+        mod.CreateVector(1, 1, 1),
+        1,
+        mod.UIAnchor.Center
+    );
+    const timeWidget = mod.FindUIWidgetWithName(globalTimeName) as mod.UIWidget;
+    if (timeWidget) {
+        scoreUIWidgets.set(globalTimeName, timeWidget);
+    }
+}
+
+/**
+ * Update the global time widget
+ * Call this function every second to refresh the time display
+ */
+export function updateTimeWidget(): void {
+    if (!CONFIG.ui.enableHud) return;
+
+    const globalTimeName = "scoreUI_global_time";
+    const timeWidget = scoreUIWidgets.get(globalTimeName);
+    if (!timeWidget) return;
+
+    const remainingTime = mod.GetMatchTimeRemaining();
+    const minutes = Math.floor(remainingTime / 60);
+    const seconds = Math.floor(remainingTime % 60);
+    const timeMsg = getTimeRemainingMessage(minutes, seconds);
+    mod.SetUITextLabel(timeWidget, timeMsg);
 }
 
 
@@ -465,6 +548,241 @@ export function removeScoreUIForPlayer(playerId: number): void {
                 console.log("Could not delete widget " + key + ":", error);
             }
             scoreUIWidgets.delete(key);
+        }
+    }
+}
+
+/**
+ * Show a global full-screen black overlay with the score UI centered.
+ * Intended for end-of-round presentation.
+ */
+export function showEndOfRoundOverlay(winningTeamId?: number): void {
+    // Create a full-screen black container
+    const overlayName = "scoreUI_end_round_overlay";
+    const existingOverlay = mod.FindUIWidgetWithName(overlayName) as mod.UIWidget;
+    if (!existingOverlay) {
+        // Use a large size to cover the whole screen across resolutions
+        mod.AddUIContainer(
+            overlayName,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(4000, 3000, 0),
+            mod.UIAnchor.TopLeft,
+            mod.GetUIRoot(),
+            true,
+            100, // draw order above most HUD
+            mod.CreateVector(0, 0, 0),
+            1.0,
+            mod.UIBgFill.Solid
+        );
+    }
+    const overlay = mod.FindUIWidgetWithName(overlayName) as mod.UIWidget;
+    if (!overlay) return;
+    // Ensure the overlay renders above the in-game HUD/UI
+    try { mod.SetUIWidgetDepth(overlay, mod.UIDepth.AboveGameUI); } catch { }
+
+    // Add a top-center "Round Over" banner above the overlay
+    const titleName = "scoreUI_end_round_title";
+    let titleWidget = mod.FindUIWidgetWithName(titleName) as mod.UIWidget;
+    if (!titleWidget) {
+        mod.AddUIText(
+            titleName,
+            mod.CreateVector(0, 20, 0),
+            mod.CreateVector(600, 60, 0),
+            mod.UIAnchor.TopCenter,
+            mod.GetUIRoot(),
+            true,
+            101,
+            mod.CreateVector(0, 0, 0),
+            0.0,
+            mod.UIBgFill.None,
+            mod.Message(mod.stringkeys.vipFiesta.ui.roundOver),
+            28,
+            mod.CreateVector(1, 1, 1),
+            1,
+            mod.UIAnchor.Center
+        );
+        titleWidget = mod.FindUIWidgetWithName(titleName) as mod.UIWidget;
+    }
+    try { if (titleWidget) mod.SetUIWidgetDepth(titleWidget, mod.UIDepth.AboveGameUI); } catch { }
+
+    // Centered container to house the score UI
+    const contentName = "scoreUI_end_round_overlay_content";
+    let content = mod.FindUIWidgetWithName(contentName) as mod.UIWidget;
+    if (!content) {
+        const totalHeight = HEADER_HEIGHT + TIME_WIDGET_SPACING + TIME_WIDGET_HEIGHT + (TEAM_ENTRY_HEIGHT + TEAM_ENTRY_SPACING) * Math.min(gameState.sortedTeamScores.length, MAX_TEAMS_DISPLAYED);
+        mod.AddUIContainer(
+            contentName,
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(SCORE_UI_WIDTH, totalHeight, 0),
+            mod.UIAnchor.Center,
+            overlay,
+            true,
+            101,
+            mod.CreateVector(0, 0, 0),
+            0.0,
+            mod.UIBgFill.None
+        );
+        content = mod.FindUIWidgetWithName(contentName) as mod.UIWidget;
+        if (!content) return;
+        try { mod.SetUIWidgetDepth(content, mod.UIDepth.AboveGameUI); } catch { }
+
+        // Header: show winner team if available, else show target kills
+        const headerMessage = (winningTeamId !== undefined)
+            ? mod.Message(mod.stringkeys.vipFiesta.ui.roundOverWinner, winningTeamId)
+            : mod.Message(mod.stringkeys.vipFiesta.ui.targetHeader, CONFIG.targetVipKills);
+        mod.AddUIText(
+            contentName + "_header",
+            mod.CreateVector(0, 0, 0),
+            mod.CreateVector(SCORE_UI_WIDTH, HEADER_HEIGHT, 0),
+            mod.UIAnchor.TopLeft,
+            content,
+            true,
+            0,
+            mod.CreateVector(0.1, 0.1, 0.1),
+            0.9,
+            mod.UIBgFill.Solid,
+            headerMessage,
+            HEADER_FONT_SIZE,
+            mod.CreateVector(1, 1, 1),
+            1,
+            mod.UIAnchor.Center
+        );
+        const hdr = mod.FindUIWidgetWithName(contentName + "_header") as mod.UIWidget;
+        try { if (hdr) mod.SetUIWidgetDepth(hdr, mod.UIDepth.AboveGameUI); } catch { }
+
+        // Time widget (shows remaining at the moment of overlay)
+        const overlayRemainingTime = mod.GetMatchTimeRemaining();
+        const oMinutes = Math.floor(overlayRemainingTime / 60);
+        const oSeconds = Math.floor(overlayRemainingTime % 60);
+        const oTimeMsg = getTimeRemainingMessage(oMinutes, oSeconds);
+        mod.AddUIText(
+            contentName + "_time",
+            mod.CreateVector(0, HEADER_HEIGHT + TIME_WIDGET_SPACING, 0),
+            mod.CreateVector(SCORE_UI_WIDTH, TIME_WIDGET_HEIGHT, 0),
+            mod.UIAnchor.TopLeft,
+            content,
+            true,
+            0,
+            mod.CreateVector(0.1, 0.1, 0.1),
+            0.9,
+            mod.UIBgFill.Solid,
+            oTimeMsg,
+            14,
+            mod.CreateVector(1, 1, 1),
+            1,
+            mod.UIAnchor.Center
+        );
+        const timeHdr = mod.FindUIWidgetWithName(contentName + "_time") as mod.UIWidget;
+        try { if (timeHdr) mod.SetUIWidgetDepth(timeHdr, mod.UIDepth.AboveGameUI); } catch { }
+
+        // Render top teams centered beneath time
+        const yOffset = HEADER_HEIGHT + TIME_WIDGET_SPACING + TIME_WIDGET_HEIGHT;
+        const teamsToDisplay = gameState.sortedTeamScores.slice(0, MAX_TEAMS_DISPLAYED);
+        for (let i = 0; i < teamsToDisplay.length; i++) {
+            const teamInfo = teamsToDisplay[i];
+            const entryName = contentName + `_team_${i}`;
+
+            // Team container
+            mod.AddUIContainer(
+                entryName,
+                mod.CreateVector(0, yOffset + i * (TEAM_ENTRY_HEIGHT + TEAM_ENTRY_SPACING), 0),
+                mod.CreateVector(SCORE_UI_WIDTH, TEAM_ENTRY_HEIGHT, 0),
+                mod.UIAnchor.TopLeft,
+                content,
+                true,
+                0,
+                mod.CreateVector(0.1, 0.1, 0.1),
+                0.85,
+                mod.UIBgFill.Solid
+            );
+            const teamContainer = mod.FindUIWidgetWithName(entryName) as mod.UIWidget;
+            if (!teamContainer) continue;
+
+            // Label (rank + team id)
+            const labelMessage = getTeamLabelMessage(teamInfo, false);
+            mod.AddUIText(
+                entryName + "_label",
+                mod.CreateVector(8, 0, 0),
+                mod.CreateVector(150, TEAM_ENTRY_HEIGHT, 0),
+                mod.UIAnchor.TopLeft,
+                teamContainer,
+                true,
+                0,
+                mod.CreateVector(0, 0, 0),
+                0,
+                mod.UIBgFill.None,
+                labelMessage,
+                14,
+                mod.CreateVector(1, 1, 1),
+                1,
+                mod.UIAnchor.CenterLeft
+            );
+
+            // Progress bar
+            const progressBarWidth = 180;
+            const progressBarHeight = 20;
+            const progressBarX = 160;
+            const progressBarY = (TEAM_ENTRY_HEIGHT - progressBarHeight) / 2;
+            mod.AddUIContainer(
+                entryName + "_progress_bg",
+                mod.CreateVector(progressBarX, progressBarY, 0),
+                mod.CreateVector(progressBarWidth, progressBarHeight, 0),
+                mod.UIAnchor.TopLeft,
+                teamContainer,
+                true,
+                0,
+                mod.CreateVector(0.1, 0.1, 0.1),
+                0.8,
+                mod.UIBgFill.Solid
+            );
+            const progressBg = mod.FindUIWidgetWithName(entryName + "_progress_bg") as mod.UIWidget;
+            if (progressBg) {
+                const targetKills = Math.max(CONFIG.targetVipKills, 1);
+                const progress = Math.min(teamInfo.vipKills / targetKills, 1.0);
+                const fillWidth = Math.max(progressBarWidth * progress, MIN_PROGRESS_BAR_WIDTH);
+                const teamColor = getTeamColor(teamInfo.teamId);
+
+                mod.AddUIImage(
+                    entryName + "_progress_fill",
+                    mod.CreateVector(0, 0, 0),
+                    mod.CreateVector(fillWidth, progressBarHeight, 0),
+                    mod.UIAnchor.TopLeft,
+                    progressBg,
+                    true,
+                    0,
+                    teamColor,
+                    0.9,
+                    mod.UIBgFill.Solid,
+                    mod.UIImageType.None,
+                    teamColor,
+                    1
+                );
+            }
+
+            // Score value (right)
+            mod.AddUIText(
+                entryName + "_score",
+                mod.CreateVector(0, 0, 0),
+                mod.CreateVector(50, TEAM_ENTRY_HEIGHT, 0),
+                mod.UIAnchor.TopRight,
+                teamContainer,
+                true,
+                0,
+                mod.CreateVector(0, 0, 0),
+                0,
+                mod.UIBgFill.None,
+                mod.Message(mod.stringkeys.vipFiesta.ui.plainNumber, teamInfo.vipKills),
+                16,
+                mod.CreateVector(1, 1, 1),
+                1,
+                mod.UIAnchor.CenterRight
+            );
+        }
+
+        // Set initial time label to current remaining at overlay moment
+        const otw = mod.FindUIWidgetWithName(contentName + "_time") as mod.UIWidget;
+        if (otw) {
+            try { mod.SetUIWidgetDepth(otw, mod.UIDepth.AboveGameUI); } catch { }
         }
     }
 }
