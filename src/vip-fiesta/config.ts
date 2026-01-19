@@ -1,5 +1,6 @@
 export interface VipFiestaConfig {
     targetVipKills: number;
+    timeLimitMinutes: number;
     vipReassignDelaySeconds: number;
     showIntroOnDeploy: boolean;
     onTimeLimitAnnounceWinner: boolean;
@@ -21,7 +22,8 @@ export interface VipFiestaConfig {
 }
 
 export const CONFIG: VipFiestaConfig = {
-    targetVipKills: 10,
+    targetVipKills: 3,
+    timeLimitMinutes: 3,
     vipReassignDelaySeconds: 5,
     showIntroOnDeploy: true,
     onTimeLimitAnnounceWinner: true,

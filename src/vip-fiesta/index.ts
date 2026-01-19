@@ -19,6 +19,7 @@ export class VIPFiesta {
         initializeAudio();
         initializeScoreboard();
         initializeScoreUI();
+        mod.SetGameModeTimeLimit(CONFIG.timeLimitMinutes * 60);
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.vipFiesta.notifications.gameStarting));
     }
 
@@ -47,7 +48,12 @@ export class VIPFiesta {
         if (now - gameState.lastTimeUpdateAt >= 1000) {
             updateTimeWidget();
             gameState.lastTimeUpdateAt = now;
+            if (mod.GetMatchTimeRemaining() <= 7) {
+                this.endRound(gameState.sortedTeamScores[0]?.teamId);
+            }
         }
+
+
     }
 
     onPlayerDeployed(player: mod.Player): void {
@@ -305,28 +311,15 @@ export class VIPFiesta {
             await mod.Wait(5);
             let winnerTeam: mod.Team | undefined;
             if (winningTeamId !== undefined) {
-                const players = mod.AllPlayers();
-                for (let i = 0; i < mod.CountOf(players); i++) {
-                    const p = mod.ValueInArray(players, i) as mod.Player;
-                    const t = mod.GetTeam(p);
-                    if (mod.GetObjId(t) === winningTeamId) {
-                        winnerTeam = t;
-                        break;
-                    }
-                }
+                winnerTeam = mod.GetTeam(winningTeamId);
             }
-            try {
-                if (winnerTeam) {
-                    mod.EndGameMode(winnerTeam);
-                } else {
-                    // Fallback: use any player's team
-                    const players = mod.AllPlayers();
-                    if (mod.CountOf(players) > 0) {
-                        const p = mod.ValueInArray(players, 0) as mod.Player;
-                        mod.EndGameMode(mod.GetTeam(p));
-                    }
-                }
-            } catch { }
+            if (winnerTeam) {
+                mod.EndGameMode(winnerTeam);
+            } else {
+                // Fallback: use draw with team 0
+                const teamZero = mod.GetTeam(0);
+                mod.EndGameMode(teamZero);
+            }
         })();
     }
 

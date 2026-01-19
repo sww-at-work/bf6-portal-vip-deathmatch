@@ -12,14 +12,14 @@ import { gameState, type TeamScoreInfo } from './state.ts';
 const MAX_TEAMS_DISPLAYED = 3;
 const MIN_PROGRESS_BAR_WIDTH = 2;
 const SCORE_UI_X = 20;
-const SCORE_UI_Y = 20;
+const SCORE_UI_Y = 40;
 const SCORE_UI_WIDTH = 400;
 const SCORE_UI_HEIGHT = 250;
 const HEADER_HEIGHT = 30;
 const HEADER_FONT_SIZE = 20;
 const TIME_WIDGET_HEIGHT = 25;
 const TIME_WIDGET_SPACING = 0;
-const TEAM_ENTRY_HEIGHT = 60;
+const TEAM_ENTRY_HEIGHT = 50;
 const TEAM_ENTRY_SPACING = 0;
 
 // Store UI widgets for updating
@@ -557,6 +557,12 @@ export function removeScoreUIForPlayer(playerId: number): void {
  * Intended for end-of-round presentation.
  */
 export function showEndOfRoundOverlay(winningTeamId?: number): void {
+    const players = mod.AllPlayers();
+    for (let i = 0; i < mod.CountOf(players); i++) {
+        const player = mod.ValueInArray(players, i) as mod.Player;
+        mod.EnableAllInputRestrictions(player, true);
+    }
+
     // Create a full-screen black container
     const overlayName = "scoreUI_end_round_overlay";
     const existingOverlay = mod.FindUIWidgetWithName(overlayName) as mod.UIWidget;
@@ -601,7 +607,6 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
             mod.UIAnchor.Center
         );
         titleWidget = mod.FindUIWidgetWithName(titleName) as mod.UIWidget;
-        mod.SetUIWidgetParent(titleWidget, overlay);
     }
     if (titleWidget) mod.SetUIWidgetDepth(titleWidget, mod.UIDepth.AboveGameUI);
 
@@ -622,9 +627,8 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
         const mainWidget = mod.FindUIWidgetWithName(mainName) as mod.UIWidget;
         if (mainWidget) {
             mod.SetUIWidgetAnchor(mainWidget, mod.UIAnchor.Center);
-            //mod.SetUIWidgetPosition(mainWidget, mod.CreateVector(0, 120, 0));
+            mod.SetUIWidgetPosition(mainWidget, mod.CreateVector(0, 120, 0));
             mod.SetUIWidgetDepth(mainWidget, mod.UIDepth.AboveGameUI);
-            mod.SetUIWidgetParent(mainWidget, overlay);
         }
     }
 }
