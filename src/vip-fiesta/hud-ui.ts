@@ -214,11 +214,7 @@ export function removeHudUIForPlayer(playerId: number): void {
     // Clean up VIP status widgets
     for (const [key, widget] of hudVipWidgets.entries()) {
         if (key.startsWith(widgetPrefix)) {
-            try {
-                mod.DeleteUIWidget(widget);
-            } catch (error) {
-                console.log("Could not delete HUD widget: " + key, error);
-            }
+            mod.DeleteUIWidget(widget);
             hudVipWidgets.delete(key);
         }
     }
@@ -226,11 +222,7 @@ export function removeHudUIForPlayer(playerId: number): void {
     // Clean up intro widgets
     for (const [key, widget] of hudIntroWidgets.entries()) {
         if (key.startsWith(introPrefix)) {
-            try {
-                mod.DeleteUIWidget(widget);
-            } catch (error) {
-                console.log("Could not delete intro widget: " + key, error);
-            }
+            mod.DeleteUIWidget(widget);
             hudIntroWidgets.delete(key);
         }
     }

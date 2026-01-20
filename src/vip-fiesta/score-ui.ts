@@ -6,7 +6,9 @@
  */
 
 import { CONFIG } from './config.ts';
+import { getTeamColor } from './utilities.ts';
 import { gameState, type TeamScoreInfo } from './state.ts';
+import { removeHudUIForPlayer } from './hud-ui.ts';
 
 // Constants
 const MAX_TEAMS_DISPLAYED = 3;
@@ -46,29 +48,7 @@ function getTimeRemainingMessage(minutes: number, seconds: number): mod.Message 
     }
 }
 
-/**
- * Get team color based on team ID
- * Handles team ID 0 (neutral team) gracefully
- */
-function getTeamColor(teamId: number): mod.Vector {
-    // Using BF team colors: Team 1 (blue), Team 2 (orange/red), etc.
-    const colors = [
-        mod.CreateVector(0.2, 0.5, 1.0),   // Team 1: Blue
-        mod.CreateVector(1.0, 0.4, 0.2),   // Team 2: Orange/Red
-        mod.CreateVector(0.2, 1.0, 0.5),   // Team 3: Green
-        mod.CreateVector(1.0, 1.0, 0.2),   // Team 4: Yellow
-        mod.CreateVector(0.8, 0.2, 1.0),   // Team 5: Purple
-        mod.CreateVector(1.0, 0.6, 0.8),   // Team 6: Pink
-    ];
-
-    // Handle neutral team (ID 0) or invalid IDs
-    if (teamId <= 0) {
-        return mod.CreateVector(0.5, 0.5, 0.5); // Gray for neutral/invalid
-    }
-
-    const index = (teamId - 1) % colors.length;
-    return colors[index];
-}
+// Team colors are provided by utilities via static vectors
 
 /**
  * Get rank suffix (1st, 2nd, 3rd, 4th, etc.)
@@ -557,34 +537,6 @@ export function removeScoreUIForPlayer(playerId: number): void {
  * Intended for end-of-round presentation.
  */
 export function showEndOfRoundOverlay(winningTeamId?: number): void {
-    const players = mod.AllPlayers();
-    for (let i = 0; i < mod.CountOf(players); i++) {
-        const player = mod.ValueInArray(players, i) as mod.Player;
-        mod.EnableAllInputRestrictions(player, true);
-    }
-
-    // Create a full-screen black container
-    const overlayName = "scoreUI_end_round_overlay";
-    const existingOverlay = mod.FindUIWidgetWithName(overlayName) as mod.UIWidget;
-    if (!existingOverlay) {
-        // Use a large size to cover the whole screen across resolutions
-        mod.AddUIContainer(
-            overlayName,
-            mod.CreateVector(0, 0, 0),
-            mod.CreateVector(4000, 3000, 0),
-            mod.UIAnchor.TopLeft,
-            mod.GetUIRoot(),
-            true,
-            100, // draw order above most HUD
-            mod.CreateVector(0, 0, 0),
-            1.0,
-            mod.UIBgFill.Solid
-        );
-    }
-    const overlay = mod.FindUIWidgetWithName(overlayName) as mod.UIWidget;
-    if (!overlay) return;
-    mod.SetUIWidgetDepth(overlay, mod.UIDepth.AboveGameUI);
-
     // Add a top-center "Round Over" banner above the overlay
     const titleName = "scoreUI_end_round_title";
     let titleWidget = mod.FindUIWidgetWithName(titleName) as mod.UIWidget;
@@ -593,13 +545,13 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
             titleName,
             mod.CreateVector(0, 20, 0),
             mod.CreateVector(600, 60, 0),
-            mod.UIAnchor.TopCenter,
+            mod.UIAnchor.Center,
             mod.GetUIRoot(),
             true,
-            101,
+            0,
             mod.CreateVector(0, 0, 0),
             0.0,
-            mod.UIBgFill.None,
+            mod.UIBgFill.Blur,
             mod.Message(mod.stringkeys.vipFiesta.ui.roundOver),
             28,
             mod.CreateVector(1, 1, 1),
@@ -610,25 +562,76 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
     }
     if (titleWidget) mod.SetUIWidgetDepth(titleWidget, mod.UIDepth.AboveGameUI);
 
-    // Ensure global header + time stay at TopLeft and above overlay
+    // Ensure global header + time are moved to center
     const globalHeaderName = "scoreUI_global_header";
     const globalTimeName = "scoreUI_global_time";
     const headerWidget = mod.FindUIWidgetWithName(globalHeaderName) as mod.UIWidget;
     const timeWidget = mod.FindUIWidgetWithName(globalTimeName) as mod.UIWidget;
-    if (headerWidget) mod.SetUIWidgetDepth(headerWidget, mod.UIDepth.AboveGameUI);
-    if (timeWidget) mod.SetUIWidgetDepth(timeWidget, mod.UIDepth.AboveGameUI);
+    if (headerWidget) {
+        mod.SetUIWidgetDepth(headerWidget, mod.UIDepth.AboveGameUI);
+        mod.SetUIWidgetAnchor(headerWidget, mod.UIAnchor.Center);
+        mod.SetUIWidgetBgFill(headerWidget, mod.UIBgFill.Solid);
+        mod.SetUIWidgetBgColor(headerWidget, mod.CreateVector(0, 0, 0));
+        mod.SetUIWidgetBgAlpha(headerWidget, 0.9);
+    }
+    if (timeWidget) {
+        mod.SetUIWidgetDepth(timeWidget, mod.UIDepth.AboveGameUI);
+        mod.SetUIWidgetAnchor(timeWidget, mod.UIAnchor.Center);
+        mod.SetUIWidgetBgFill(timeWidget, mod.UIBgFill.Solid);
+        mod.SetUIWidgetBgColor(timeWidget, mod.CreateVector(0, 0, 0));
+        mod.SetUIWidgetBgAlpha(timeWidget, 0.9);
+    }
+
+    // Calculate stacked positions (no gaps) for title, header, time, and main UI
+    const titleHeight = 60; // from AddUIText size above
+    const headerHeight = HEADER_HEIGHT; // 30
+    const timeHeight = TIME_WIDGET_HEIGHT; // 25
+    const mainHeight = SCORE_UI_HEIGHT; // 250
+    const totalHeight = titleHeight + headerHeight + timeHeight + mainHeight;
+    let currentY = -totalHeight / 2;
+
+    // Position title
+    if (titleWidget) {
+        const titleCenterY = currentY + titleHeight / 2;
+        mod.SetUIWidgetAnchor(titleWidget, mod.UIAnchor.Center);
+        mod.SetUIWidgetPosition(titleWidget, mod.CreateVector(0, titleCenterY, 0));
+    }
+    currentY += titleHeight;
+
+    // Position header
+    if (headerWidget) {
+        const headerCenterY = currentY + headerHeight / 2;
+        mod.SetUIWidgetPosition(headerWidget, mod.CreateVector(0, headerCenterY, 0));
+    }
+    currentY += headerHeight;
+
+    // Position time widget
+    if (timeWidget) {
+        const timeCenterY = currentY + timeHeight / 2;
+        mod.SetUIWidgetPosition(timeWidget, mod.CreateVector(0, timeCenterY, 0));
+    }
+    currentY += timeHeight;
 
     // Move existing per-player score UI to center and raise depth
     const allPlayers = mod.AllPlayers();
     for (let i = 0; i < mod.CountOf(allPlayers); i++) {
         const player = mod.ValueInArray(allPlayers, i) as mod.Player;
         const playerId = mod.GetObjId(player);
+
+        mod.EnableAllInputRestrictions(player, true);
+        // if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive) && mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier)) {
+        //     mod.UndeployPlayer(player);
+        // }
+
+        removeHudUIForPlayer(playerId);
+
         const mainName = "scoreUI_" + playerId + "_main";
         const mainWidget = mod.FindUIWidgetWithName(mainName) as mod.UIWidget;
         if (mainWidget) {
-            mod.SetUIWidgetAnchor(mainWidget, mod.UIAnchor.Center);
-            mod.SetUIWidgetPosition(mainWidget, mod.CreateVector(0, 120, 0));
             mod.SetUIWidgetDepth(mainWidget, mod.UIDepth.AboveGameUI);
+            mod.SetUIWidgetAnchor(mainWidget, mod.UIAnchor.Center);
+            const mainCenterY = currentY + mainHeight / 2;
+            mod.SetUIWidgetPosition(mainWidget, mod.CreateVector(0, mainCenterY, 0));
         }
     }
 }

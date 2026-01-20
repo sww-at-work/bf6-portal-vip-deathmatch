@@ -1,4 +1,5 @@
 import { CONFIG } from './config.ts';
+import { getTeamColor } from './utilities.ts';
 import { gameState } from './state.ts';
 
 type VipIconEntry = { icon: mod.WorldIcon; player: mod.Player };
@@ -32,7 +33,9 @@ function ensureVipWorldIconForTeam(vip: mod.Player, ownerTeam: mod.Team, friendl
 
     // Configure icon per team visibility and styling
     const iconImage = friendly ? CONFIG.markers.friendlyIconImage : CONFIG.markers.enemyIconImage;
-    const iconColor = friendly ? CONFIG.markers.friendlyColorRGB : CONFIG.markers.enemyColorRGB;
+    // Enemy VIP icons should use the VIP's team color; friendly can keep configured friendly color
+    const vipTeamId = mod.GetObjId(mod.GetTeam(vip));
+    const iconColor = friendly ? CONFIG.markers.friendlyColorRGB : getTeamColor(vipTeamId);
     mod.SetWorldIconImage(worldicon, iconImage);
     mod.SetWorldIconColor(worldicon, iconColor);
     mod.SetWorldIconOwner(worldicon, ownerTeam);
