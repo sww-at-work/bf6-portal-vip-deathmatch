@@ -214,6 +214,7 @@ export function removeHudUIForPlayer(playerId: number): void {
     // Clean up VIP status widgets
     for (const [key, widget] of hudVipWidgets.entries()) {
         if (key.startsWith(widgetPrefix)) {
+            if (!mod.FindUIWidgetWithName(key)) continue;
             mod.DeleteUIWidget(widget);
             hudVipWidgets.delete(key);
         }
@@ -222,6 +223,7 @@ export function removeHudUIForPlayer(playerId: number): void {
     // Clean up intro widgets
     for (const [key, widget] of hudIntroWidgets.entries()) {
         if (key.startsWith(introPrefix)) {
+            if (!mod.FindUIWidgetWithName(key)) continue;
             mod.DeleteUIWidget(widget);
             hudIntroWidgets.delete(key);
         }

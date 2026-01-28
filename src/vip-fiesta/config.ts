@@ -22,8 +22,8 @@ export interface VipFiestaConfig {
 }
 
 export const CONFIG: VipFiestaConfig = {
-    targetVipKills: 3,
-    timeLimitMinutes: 3,
+    targetVipKills: 20,
+    timeLimitMinutes: 20,
     vipReassignDelaySeconds: 5,
     showIntroOnDeploy: true,
     onTimeLimitAnnounceWinner: true,

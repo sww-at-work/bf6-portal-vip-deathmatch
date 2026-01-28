@@ -550,7 +550,7 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
             true,
             0,
             mod.CreateVector(0, 0, 0),
-            0.0,
+            1.0,
             mod.UIBgFill.Blur,
             mod.Message(mod.stringkeys.vipFiesta.ui.roundOver),
             28,
@@ -619,9 +619,9 @@ export function showEndOfRoundOverlay(winningTeamId?: number): void {
         const playerId = mod.GetObjId(player);
 
         mod.EnableAllInputRestrictions(player, true);
-        // if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive) && mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier)) {
-        //     mod.UndeployPlayer(player);
-        // }
+        if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive) && mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier)) {
+            mod.UndeployPlayer(player);
+        }
 
         removeHudUIForPlayer(playerId);
 
